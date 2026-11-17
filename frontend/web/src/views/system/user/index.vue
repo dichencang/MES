@@ -64,12 +64,17 @@ function openEdit(row: UserItem) {
 async function submit() {
   const valid = await formRef.value?.validate().catch(() => false)
   if (!valid) return
+  // 新建时账号/密码/部门必填（后端 deptId 拒空串，前端先拦）
+  if (!editing.value) {
+    if (!createForm.username.trim()) { ElMessage.warning('请输入账号'); return }
+    if (!createForm.password) { ElMessage.warning('请输入密码'); return }
+    if (!form.deptId) { ElMessage.warning('请选择部门'); return }
+  }
   const payload: Record<string, unknown> = {
     realName: form.realName, deptId: form.deptId,
     phone: form.phone || null, email: form.email || null,
   }
   if (!editing.value) {
-    // 新建：账号与密码必填，用弹窗补充
     payload.username = createForm.username
     payload.password = createForm.password
     payload.roleIds = createForm.roleIds
@@ -122,7 +127,10 @@ async function remove(row: UserItem) {
   load()
 }
 
-const rules = { realName: [{ required: true, message: '请输入姓名', trigger: 'blur' }] }
+const rules = {
+  realName: [{ required: true, message: '请输入姓名', trigger: 'blur' }],
+  deptId: [{ required: true, message: '请选择部门', trigger: 'change' }],
+}
 
 onMounted(() => { load(); loadOptions() })
 </script>
@@ -200,7 +208,7 @@ onMounted(() => { load(); loadOptions() })
           <el-form-item label="角色"><el-select v-model="createForm.roleIds" multiple style="width: 100%"><el-option v-for="r in roles" :key="r.id" :label="r.roleName" :value="r.id" /></el-select></el-form-item>
         </template>
         <el-form-item label="姓名" prop="realName"><el-input v-model="form.realName" /></el-form-item>
-        <el-form-item label="部门">
+        <el-form-item label="部门" prop="deptId">
           <el-select v-model="form.deptId" style="width: 100%"><el-option v-for="d in depts" :key="d.id" :label="d.deptName" :value="d.id" /></el-select>
         </el-form-item>
         <el-form-item label="手机号"><el-input v-model="form.phone" /></el-form-item>
