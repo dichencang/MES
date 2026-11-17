@@ -6,17 +6,18 @@ import { tokenStore } from '@/api/request'
 
 const modules = import.meta.glob('@/views/**/*.vue')
 
-/** 将后端 component（如 system/user/index）映射为异步组件 */
+/** 将后端 component（如 system/user/index）映射为异步组件。按后缀匹配，不依赖 glob key 前缀。 */
 function resolveComponent(component: string) {
-  const loader = modules[`/src/views/${component}.vue`]
-  if (loader) return loader
-  return () => import('@/views/error/Placeholder.vue')
+  const suffix = `/${component}.vue`
+  const key = Object.keys(modules).find((k) => k.endsWith(suffix))
+  const loader = key ? modules[key] : undefined
+  return loader ?? (() => import('@/views/error/Placeholder.vue'))
 }
 
 const staticRoutes: RouteRecordRaw[] = [
   { path: '/login', name: 'Login', component: () => import('@/views/login/index.vue'), meta: { public: true } },
   { path: '/403', name: 'Forbidden', component: () => import('@/views/error/403.vue'), meta: { public: true } },
-  { path: '/:pathMatch(.*)*', name: 'NotFound', component: () => import('@/views/error/404.vue'), meta: { public: true } },
+  { path: '/:pathMatch(.*)*', name: 'NotFound', component: () => import('@/views/error/404.vue') },
 ]
 
 export const router = createRouter({
@@ -38,14 +39,16 @@ export function addDynamicRoutes(): string {
   const children: RouteRecordRaw[] = []
   const collect = (nodes: typeof auth.navTree) => {
     for (const n of nodes) {
-      if (n.permType !== 'MENU' || !n.path || !n.component) continue
-      children.push({
-        path: n.path,
-        name: `perm-${n.permissionCode}`,
-        component: resolveComponent(n.component),
-        meta: { title: n.permName, permCode: n.permissionCode, icon: n.icon ?? undefined },
-      })
-      collect(n.children)
+      // 目录(DIR)不生成路由，但必须继续递归其子级——菜单都挂在目录下
+      if (n.permType === 'MENU' && n.path && n.component) {
+        children.push({
+          path: n.path,
+          name: `perm-${n.permissionCode}`,
+          component: resolveComponent(n.component),
+          meta: { title: n.permName, permCode: n.permissionCode, icon: n.icon ?? undefined },
+        })
+      }
+      if (n.children.length) collect(n.children)
     }
   }
   collect(auth.navTree)
