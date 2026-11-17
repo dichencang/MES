@@ -4,11 +4,12 @@ from sqlalchemy import select
 from app.dto.auth import ChangePassword
 from app.models import system as m
 from app.routers.auth import Account, Db
+from app.services.audit import AuditRoute
 from app.services.auth import change_password
 from app.services.permissions import granted_permissions, navigation_tree
 from app.utils.responses import ApiError, success
 
-router = APIRouter(tags=["系统管理"])
+router = APIRouter(tags=["系统管理"], route_class=AuditRoute)
 PUBLIC_CONFIG_KEYS = frozenset({"sys.app.name"})
 
 
