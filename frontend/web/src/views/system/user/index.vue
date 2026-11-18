@@ -5,6 +5,7 @@ import {
   listUsers, saveUser, deleteUser, resetPassword, setUserStatus, assignUserRoles, allRoles, getDeptTree,
 } from '@/api'
 import type { UserItem, RoleItem, DeptNode } from '@/types'
+import { formatDateTime } from '@/utils/time'
 
 const loading = ref(false)
 const rows = ref<UserItem[]>([])
@@ -177,7 +178,9 @@ onMounted(() => { load(); loadOptions() })
             <el-tag :type="(row as UserItem).status === '0' ? 'success' : 'info'">{{ (row as UserItem).status === '0' ? '正常' : '停用' }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="createTime" label="创建时间" width="170" />
+        <el-table-column label="创建时间" width="150">
+          <template #default="{ row }">{{ formatDateTime((row as UserItem).createTime) }}</template>
+        </el-table-column>
         <el-table-column label="操作" fixed="right" width="280">
           <template #default="{ row }">
             <template v-if="(row as UserItem).isBuiltin === '0'">

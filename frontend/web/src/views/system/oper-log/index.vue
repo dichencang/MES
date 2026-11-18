@@ -3,6 +3,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { listOperLogs, getOperLog, clearOperLogs } from '@/api'
 import type { OperLog } from '@/types'
+import { formatDateTime } from '@/utils/time'
 
 const loading = ref(false)
 const rows = ref<OperLog[]>([])
@@ -60,7 +61,9 @@ onMounted(load)
           <template #default="{ row }"><el-tag size="small" :type="(row as OperLog).status === '0' ? 'success' : 'danger'">{{ (row as OperLog).status === '0' ? '成功' : '失败' }}</el-tag></template>
         </el-table-column>
         <el-table-column prop="costTime" label="耗时(ms)" width="100" />
-        <el-table-column prop="operTime" label="操作时间" width="170" />
+        <el-table-column label="操作时间" width="150">
+          <template #default="{ row }">{{ formatDateTime((row as OperLog).operTime) }}</template>
+        </el-table-column>
         <el-table-column label="操作" fixed="right" width="80">
           <template #default="{ row }">
             <el-button v-perm="'system:oper-log:query'" link type="primary" @click="openDetail((row as OperLog).id)">详情</el-button>
@@ -84,7 +87,7 @@ onMounted(load)
         <el-descriptions-item label="耗时">{{ detail.costTime }} ms</el-descriptions-item>
         <el-descriptions-item label="结果"><el-tag size="small" :type="detail.status === '0' ? 'success' : 'danger'">{{ detail.status === '0' ? '成功' : '失败' }}</el-tag></el-descriptions-item>
         <el-descriptions-item label="错误信息" :span="2">{{ detail.errorMsg || '—' }}</el-descriptions-item>
-        <el-descriptions-item label="操作时间" :span="2">{{ detail.operTime }}</el-descriptions-item>
+        <el-descriptions-item label="操作时间" :span="2">{{ formatDateTime(detail.operTime) }}</el-descriptions-item>
       </el-descriptions>
     </el-dialog>
   </div>

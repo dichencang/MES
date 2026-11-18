@@ -63,16 +63,16 @@ onMounted(loadTypes)
     <el-card>
       <template #header><span class="title">数据字典</span></template>
       <el-row :gutter="16">
-        <el-col :span="7">
+        <el-col :span="9">
           <div class="col-head">
             <span>字典类型</span>
             <el-button v-perm="'system:dict:type-create'" link type="primary" @click="openTypeCreate">新增</el-button>
           </div>
           <el-table :data="types" v-loading="loading" highlight-current-row border
             @current-change="(row: DictType) => row && selectType(row)">
-            <el-table-column prop="dictName" label="名称" min-width="120" />
-            <el-table-column prop="dictCode" label="编码" min-width="120" />
-            <el-table-column label="操作" width="110">
+            <el-table-column prop="dictName" label="名称" min-width="100" />
+            <el-table-column prop="dictCode" label="编码" min-width="150" show-overflow-tooltip />
+            <el-table-column label="操作" width="100">
               <template #default="{ row }">
                 <el-button v-perm="'system:dict:type-update'" link type="primary" @click.stop="openTypeEdit(row as DictType)">编辑</el-button>
                 <el-button v-perm="'system:dict:type-delete'" link type="danger" @click.stop="removeType(row as DictType)">删除</el-button>
@@ -80,7 +80,7 @@ onMounted(loadTypes)
             </el-table-column>
           </el-table>
         </el-col>
-        <el-col :span="17">
+        <el-col :span="15">
           <div class="col-head">
             <span>字典项 · {{ currentType?.dictName || '—' }}</span>
             <el-button v-perm="'system:dict:item-create'" link type="primary" :disabled="!currentType" @click="openItemCreate">新增</el-button>
@@ -128,5 +128,5 @@ onMounted(loadTypes)
 <style scoped>
 .page, .col-head { width: 100%; }
 .title { font-weight: 600; font-size: 16px; }
-.col-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-weight: 600; }
+.col-head { display: flex; justify-content: flex-start; align-items: center; gap: 10px; margin-bottom: 8px; font-weight: 600; }
 </style>
