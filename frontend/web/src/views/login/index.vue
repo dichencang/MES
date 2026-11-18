@@ -252,12 +252,9 @@ onUnmounted(clearCountdown)
               >
                 <img v-if="captcha.image && !captcha.expired" :src="captcha.image" alt="验证码" />
                 <span v-if="captcha.loading" class="captcha-tip">加载中…</span>
-                <span v-else-if="captcha.failed" class="captcha-tip">获取失败<br />点击重试</span>
-                <span v-else-if="captcha.expired" class="captcha-tip">已过期<br />点击刷新</span>
+                <span v-else-if="captcha.failed" class="captcha-tip">点击重试</span>
+                <span v-else-if="captcha.expired" class="captcha-tip">点击刷新</span>
                 <span v-else-if="!captcha.image" class="captcha-tip">点击获取</span>
-                <span v-if="!captcha.loading && !captcha.expired && !captcha.failed && captcha.image" class="captcha-badge">
-                  {{ captcha.remain }}s
-                </span>
               </button>
             </div>
           </el-form-item>
@@ -437,6 +434,7 @@ onUnmounted(clearCountdown)
 /* 验证码一行：输入框 + 图片 */
 .captcha-row {
   display: flex;
+  align-items: center;
   gap: 10px;
   width: 100%;
 }
@@ -474,18 +472,8 @@ onUnmounted(clearCountdown)
   justify-content: center;
   width: 100%;
   height: 100%;
-  font-size: 11.5px;
-  line-height: 1.5;
-  text-align: center;
+  font-size: 13px;
   color: #909399;
-}
-.captcha-badge {
-  position: absolute;
-  right: 4px;
-  bottom: 2px;
-  font-size: 10px;
-  color: #b1b3b8;
-  pointer-events: none;
 }
 
 .card-row {
