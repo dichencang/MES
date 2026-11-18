@@ -44,7 +44,7 @@ onMounted(load)
       <el-form :inline="true" :model="query" class="search">
         <el-form-item label="操作人"><el-input v-model="query.operatorName" placeholder="操作人" clearable /></el-form-item>
         <el-form-item label="模块"><el-input v-model="query.module" placeholder="模块" clearable /></el-form-item>
-        <el-form-item label="结果"><el-select v-model="query.status" placeholder="全部" clearable style="width: 100px"><el-option label="成功" value="0" /><el-option label="失败" value="1" /></el-select></el-form-item>
+        <el-form-item label="结果"><el-select v-model="query.status" placeholder="全部" clearable><el-option label="成功" value="0" /><el-option label="失败" value="1" /></el-select></el-form-item>
         <el-form-item label="时间">
           <el-date-picker v-model="query.timeRange" type="datetimerange" range-separator="至"
             start-placeholder="开始" end-placeholder="结束" value-format="YYYY-MM-DDTHH:mm:ssZ" />

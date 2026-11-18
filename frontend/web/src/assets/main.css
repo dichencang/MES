@@ -22,3 +22,11 @@ body,
   height: 28px;
   min-height: 28px;
 }
+
+/* 查询区（.search）内所有输入/选择/日期控件统一同宽，消除各页面宽度参差。
+   只作用于查询表单，不影响弹窗、表格内的控件。 */
+#app .search .el-input,
+#app .search .el-select,
+#app .search .el-date-editor {
+  width: 160px;
+}

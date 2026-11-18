@@ -150,12 +150,12 @@ onMounted(() => { load(); loadOptions() })
         <el-form-item label="账号"><el-input v-model="query.username" placeholder="账号" clearable /></el-form-item>
         <el-form-item label="姓名"><el-input v-model="query.realName" placeholder="姓名" clearable /></el-form-item>
         <el-form-item label="部门">
-          <el-select v-model="query.deptId" placeholder="全部" clearable style="width: 160px">
+          <el-select v-model="query.deptId" placeholder="全部" clearable>
             <el-option v-for="d in depts" :key="d.id" :label="d.deptName" :value="d.id" />
           </el-select>
         </el-form-item>
         <el-form-item label="状态">
-          <el-select v-model="query.status" placeholder="全部" clearable style="width: 110px">
+          <el-select v-model="query.status" placeholder="全部" clearable>
             <el-option label="正常" value="0" /><el-option label="停用" value="1" />
           </el-select>
         </el-form-item>
