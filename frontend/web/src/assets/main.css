@@ -30,3 +30,37 @@ body,
 #app .search .el-date-editor {
   width: 160px;
 }
+
+/* 列表页卡片铺满主内容区：消除数据少时卡片下方的大片灰色空白，分页贴卡片底部。
+   布局壳本身是高度 100vh 的 flex，这里让内容页沿用它。 */
+#app .el-main.main {
+  display: flex;
+  flex-direction: column;
+}
+#app .el-main.main > .page {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+#app .el-main.main > .page > .el-card {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+#app .el-main.main > .page > .el-card > .el-card__body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+#app .el-main.main .el-card__body > .el-pagination {
+  margin-top: auto;
+  padding-top: 16px;
+}
+
+/* 表格行高适度放松，避免过于紧凑；仍保持单页可展示。 */
+#app .el-table .el-table__cell {
+  padding: 11px 0;
+}
