@@ -435,16 +435,18 @@ onUnmounted(clearCountdown)
 .captcha-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: space-between;
+  gap: 12px;
   width: 100%;
 }
+/* 4 位验证码不需要占满整行：固定 150px，把空间留给右侧图片 */
 .captcha-row .el-input {
-  flex: 1;
+  flex: 0 0 150px;
 }
 .captcha-img {
   position: relative;
   flex: none;
-  width: 116px;
+  width: 150px;
   height: 44px;
   padding: 0;
   border: 1px solid #dcdfe6;
