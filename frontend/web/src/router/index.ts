@@ -89,7 +89,9 @@ router.beforeEach(async (to) => {
     try {
       await auth.loadProfile()
       addDynamicRoutes()
-      return { ...to, replace: true }
+      // 只按路径重新解析，不能展开整个 to：首次加载时 to 匹配的是 catch-all，
+      // 展开会带上 name:'NotFound'，导航时按 name 优先 → 又回到 404（刷新页面必现）。
+      return { path: to.path, query: to.query, hash: to.hash, replace: true }
     } catch {
       auth.reset()
       return { path: '/login' }

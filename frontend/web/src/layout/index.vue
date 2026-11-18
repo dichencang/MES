@@ -1,7 +1,9 @@
 <script setup lang="ts">
 // 布局壳：可折叠侧栏（递归菜单）+ 面包屑 + 多页签 + 用户下拉。
 // 侧栏与路由都由 /permissions/my 的 tree 驱动，这里不做任何权限判断（路由守卫已拦）。
-import { computed, onMounted, ref, watch } from 'vue'
+// 目录默认收起：路由变化后调用 el-menu 的 close() 收起所有已展开目录
+// （default-openeds 只在初始化生效，运行期改它不会关闭已展开项）。
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
@@ -18,6 +20,7 @@ const route = useRoute()
 const router = useRouter()
 
 const collapsed = ref(false)
+const menuRef = ref<{ close: (index: string) => void }>()
 const activePath = computed(() => route.path)
 const menus = computed(() => auth.navTree)
 
@@ -33,13 +36,25 @@ function findTrail(nodes: PermNode[], path: string): PermNode[] {
 
 const trail = computed(() => findTrail(menus.value, route.path))
 
-// 打开页面即记入页签
+/** 收起所有目录（含多级） */
+function collapseAll(nodes: PermNode[] = menus.value) {
+  for (const node of nodes) {
+    if (node.children?.length) {
+      menuRef.value?.close(node.path || node.id)
+      collapseAll(node.children)
+    }
+  }
+}
+
+// 打开页面即记入页签，并收起目录，避免一进系统整棵树铺开
 watch(
   () => route.path,
-  () => {
+  async () => {
     const title = (route.meta.title as string) || trail.value.at(-1)?.permName || '未命名页面'
     tabs.add({ path: route.path, title })
     document.title = `${title} · ${APP_TITLE}`
+    await nextTick()
+    collapseAll()
   },
   { immediate: true },
 )
@@ -77,7 +92,9 @@ onMounted(() => {
         <span v-else>MES</span>
       </div>
       <el-menu
+        ref="menuRef"
         :default-active="activePath"
+        :default-openeds="[]"
         :collapse="collapsed"
         :collapse-transition="false"
         background-color="#001529"
