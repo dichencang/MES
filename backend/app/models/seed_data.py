@@ -1,5 +1,15 @@
 """System management permission seed data."""
 
+BUSINESS_MODULES = [
+    ("plan", "计划管理", "计划概览", "overview", "Calendar"),
+    ("basic", "基础数据", "基础数据概览", "overview", "Box"),
+    ("workorder", "生产工单", "工单概览", "overview", "Tickets"),
+    ("report", "报工管理", "报工概览", "overview", "EditPen"),
+    ("quality", "质检管理", "质检概览", "overview", "Checked"),
+    ("inventory", "库存管理", "库存概览", "overview", "Files"),
+    ("dashboard", "生产看板", "生产看板", "board", "DataLine"),
+]
+
 PERMISSIONS = [
     (1, 0, '系统管理', 'DIR', 'system', '/system', None, 'Setting', 9),
     (2, 1, '用户管理', 'MENU', 'system:user', '/system/user', 'system/user/index', 'User', 1),

@@ -23,11 +23,15 @@ def navigation_tree(rows):
     for row in rows:
         if row["perm_type"] == "MENU" and row["visible"] == "0":
             menus.setdefault(row["parent_id"], []).append(node(row, []))
-    return [
-        node(row, menus[row["id"]])
-        for row in rows
-        if row["perm_type"] == "DIR" and row["visible"] == "0" and row["id"] in menus
-    ]
+    tree = []
+    for row in rows:
+        if row["visible"] != "0":
+            continue
+        if row["perm_type"] == "MENU" and row["parent_id"] == 0:
+            tree.append(node(row, []))
+        elif row["perm_type"] == "DIR" and row["id"] in menus:
+            tree.append(node(row, menus[row["id"]]))
+    return tree
 
 
 def node(row, children):

@@ -225,10 +225,16 @@ async def save_node(db, table, body, id=None):
     if table is m.permission:
         code = data.get("permission_code") if id is None else old["permission_code"]
         kind = data["perm_type"]
-        parent_type = {"DIR": None, "MENU": "DIR", "BUTTON": "MENU"}[kind]
-        if (parent["perm_type"] if parent else None) != parent_type:
+        parent_types = {"DIR": (None,), "MENU": (None, "DIR"), "BUTTON": ("MENU",)}
+        if (parent["perm_type"] if parent else None) not in parent_types[kind]:
             raise invalid("权限层级无效")
-        expected = (re.escape(parent["permission_code"]) + ":" if parent else "") + r"[a-z0-9]+(?:-[a-z0-9]+)*"
+        segment = r"[a-z0-9]+(?:-[a-z0-9]+)*"
+        prefix = re.escape(parent["permission_code"]) + ":" if parent else ""
+        expected = prefix + segment
+        if kind == "MENU":
+            expected = prefix + (
+                rf"{segment}(?::{segment})?" if parent else rf"{segment}:{segment}:{segment}"
+            )
         if not re.fullmatch(expected, code):
             raise invalid("权限编码与层级不匹配")
         if kind == "MENU" and (not (data["path"] or "").startswith("/") or not data["component"]):
