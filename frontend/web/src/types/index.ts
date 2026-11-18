@@ -46,6 +46,21 @@ export interface AuthSession {
   expiresIn: number
 }
 
+/** POST /auth/login 请求体（图片验证码为必填） */
+export interface LoginPayload {
+  username: string
+  password: string
+  captchaId: string
+  captchaCode: string
+}
+
+/** GET /auth/captcha 响应 data：image 为 PNG data URL，expiresIn 单位秒 */
+export interface CaptchaResult {
+  captchaId: string
+  image: string
+  expiresIn: number
+}
+
 /** GET /auth/me 响应 data */
 export interface UserInfo {
   id: string

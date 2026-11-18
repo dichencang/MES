@@ -1,14 +1,20 @@
 <script setup lang="ts">
-// 登录页：左侧品牌信息区 + 右侧登录卡片。
-// 账号可记住（仅存用户名，不存密码）；开发环境显示种子账号提示。
-import { computed, reactive, ref } from 'vue'
+// 登录页：左侧品牌信息区 + 右侧登录卡片（含图片验证码）。
+// 交互依据「登录图片验证码增量契约」：
+//   打开即取图；点图换图并清空输入；到期显示「已过期，点击刷新」；连点防抖且只接受最新响应；
+//   2004/2005 清空验证码并换图（保留账号密码）；1001 只标红字段；提示由请求层统一弹，本页不重复弹。
+import { computed, onUnmounted, reactive, ref, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, type FormInstance } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
 import { addDynamicRoutes } from '@/router'
+import { getCaptcha } from '@/api'
+import { ApiError } from '@/api/request'
+import { BIZ_CODE, LOCAL_CODE } from '@/constants/biz'
 import { APP_TITLE } from '@/constants'
 
 const REMEMBER_KEY = 'mes_login_username'
+const CAPTCHA_LENGTH = 4
 
 const router = useRouter()
 const route = useRoute()
@@ -16,35 +22,133 @@ const auth = useAuthStore()
 
 const formRef = ref<FormInstance>()
 const rememberedName = localStorage.getItem(REMEMBER_KEY) ?? ''
-const form = reactive({ username: rememberedName, password: '' })
+const form = reactive({ username: rememberedName, password: '', captchaCode: '' })
 const remember = ref(Boolean(rememberedName))
 const loading = ref(false)
 const isDev = computed(() => import.meta.env.DEV)
 
+// ── 验证码状态 ──────────────────────────────────────────────
+const captcha = reactive({
+  id: '',
+  image: '',
+  loading: false,
+  /** 取图失败（网络/503） */
+  failed: false,
+  /** 已到期，需用户点击刷新 */
+  expired: false,
+  /** 剩余秒数，仅用于提示 */
+  remain: 0,
+})
+let seq = 0
+let countdown: number | undefined
+
+function clearCountdown() {
+  if (countdown) window.clearInterval(countdown)
+  countdown = undefined
+}
+
+function scheduleExpire(seconds: number) {
+  clearCountdown()
+  captcha.remain = seconds
+  countdown = window.setInterval(() => {
+    captcha.remain -= 1
+    if (captcha.remain <= 0) {
+      captcha.expired = true
+      clearCountdown()
+    }
+  }, 1000)
+}
+
+async function loadCaptcha() {
+  if (captcha.loading) return
+  const my = ++seq
+  captcha.loading = true
+  captcha.failed = false
+  try {
+    const res = await getCaptcha()
+    if (my !== seq) return // 已有更新的请求，丢弃本次响应
+    captcha.id = res.captchaId
+    captcha.image = res.image
+    captcha.expired = false
+    form.captchaCode = ''
+    scheduleExpire(res.expiresIn)
+  } catch {
+    if (my !== seq) return
+    captcha.failed = true
+    captcha.id = ''
+    captcha.image = ''
+    clearCountdown()
+  } finally {
+    if (my === seq) captcha.loading = false
+  }
+}
+
+/** 输入即过滤：只留字母数字、转大写、限长 */
+function onCaptchaInput(value: string) {
+  form.captchaCode = value.replace(/[^0-9a-zA-Z]/g, '').slice(0, CAPTCHA_LENGTH).toUpperCase()
+  nextTick(() => formRef.value?.clearValidate('captchaCode'))
+}
+
 const rules = {
   username: [{ required: true, message: '请输入账号', trigger: 'blur' }],
   password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
+  captchaCode: [{ required: true, message: '请输入验证码', trigger: 'blur' }],
 }
 
 async function handleLogin() {
   const valid = await formRef.value?.validate().catch(() => false)
   if (!valid || loading.value) return
+
+  if (!captcha.id || captcha.expired) {
+    ElMessage.warning(
+      captcha.failed ? '验证码获取失败，请点击图片重试'
+        : captcha.expired ? '验证码已过期，请点击图片刷新'
+          : '请先获取验证码',
+    )
+    loadCaptcha()
+    return
+  }
+
   loading.value = true
   try {
-    await auth.login(form.username, form.password)
+    await auth.login({
+      username: form.username,
+      password: form.password,
+      captchaId: captcha.id,
+      captchaCode: form.captchaCode,
+    })
     if (remember.value) localStorage.setItem(REMEMBER_KEY, form.username)
     else localStorage.removeItem(REMEMBER_KEY)
+
     const home = addDynamicRoutes()
-    // redirect 只在指向具体页面时采用；'/' 要靠 Layout 子路由重定向，易在重建时序里落 404，故一律回首页
+    // redirect 只在指向具体页面时采用；'/' 要靠 Layout 子路由重定向，易在重建时序里落 404
     const redirect = route.query.redirect as string | undefined
     const target = redirect && redirect !== '/' && redirect !== '/login' ? redirect : home
+    clearCountdown()
     await router.replace(target)
-  } catch {
-    ElMessage.error('登录失败，请检查账号或密码')
+  } catch (error) {
+    // 提示已由请求层统一弹出，这里只按业务码调整表单
+    const code = error instanceof ApiError ? error.code : undefined
+    if (code === BIZ_CODE.CAPTCHA_INVALID || code === BIZ_CODE.BAD_CREDENTIALS) {
+      // 验证码已被后端消费，必须换图；账号密码保留
+      loadCaptcha()
+    } else if (code === LOCAL_CODE.TIMEOUT || code === LOCAL_CODE.NETWORK) {
+      // 超时/断网：旧 ID 可能已被消费，重试前先换图
+      loadCaptcha()
+    }
+    // 1001 字段校验：保留当前图片，仅由表单规则标红
   } finally {
     loading.value = false
   }
 }
+
+// 记住账号被取消时同步清掉本地记录
+watch(remember, (on) => {
+  if (!on) localStorage.removeItem(REMEMBER_KEY)
+})
+
+loadCaptcha()
+onUnmounted(clearCountdown)
 </script>
 
 <template>
@@ -125,6 +229,39 @@ async function handleLogin() {
             </el-input>
           </el-form-item>
 
+          <el-form-item prop="captchaCode">
+            <div class="captcha-row">
+              <el-input
+                :model-value="form.captchaCode"
+                placeholder="请输入验证码"
+                maxlength="4"
+                autocomplete="off"
+                spellcheck="false"
+                @input="onCaptchaInput"
+              >
+                <template #prefix><el-icon><Key /></el-icon></template>
+              </el-input>
+
+              <button
+                type="button"
+                class="captcha-img"
+                :class="{ 'is-done': captcha.loading }"
+                :disabled="captcha.loading"
+                title="点击换一张"
+                @click="loadCaptcha"
+              >
+                <img v-if="captcha.image && !captcha.expired" :src="captcha.image" alt="验证码" />
+                <span v-if="captcha.loading" class="captcha-tip">加载中…</span>
+                <span v-else-if="captcha.failed" class="captcha-tip">获取失败<br />点击重试</span>
+                <span v-else-if="captcha.expired" class="captcha-tip">已过期<br />点击刷新</span>
+                <span v-else-if="!captcha.image" class="captcha-tip">点击获取</span>
+                <span v-if="!captcha.loading && !captcha.expired && !captcha.failed && captcha.image" class="captcha-badge">
+                  {{ captcha.remain }}s
+                </span>
+              </button>
+            </div>
+          </el-form-item>
+
           <div class="card-row">
             <el-checkbox v-model="remember">记住账号</el-checkbox>
           </div>
@@ -161,7 +298,6 @@ async function handleLogin() {
   background: linear-gradient(155deg, #081524 0%, #0e2440 52%, #13314f 100%);
   overflow: hidden;
 }
-/* 缓慢呼吸的光斑 + 细网格，纯 CSS，不依赖图片 */
 .brand-glow {
   position: absolute;
   top: -18%;
@@ -297,6 +433,61 @@ async function handleLogin() {
   line-height: 1.7;
   color: #909399;
 }
+
+/* 验证码一行：输入框 + 图片 */
+.captcha-row {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+}
+.captcha-row .el-input {
+  flex: 1;
+}
+.captcha-img {
+  position: relative;
+  flex: none;
+  width: 116px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid #dcdfe6;
+  border-radius: 8px;
+  background: #f5f7fa;
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color 0.15s;
+}
+.captcha-img:hover:not(:disabled) {
+  border-color: #409eff;
+}
+.captcha-img:disabled {
+  cursor: progress;
+}
+.captcha-img img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.captcha-tip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-size: 11.5px;
+  line-height: 1.5;
+  text-align: center;
+  color: #909399;
+}
+.captcha-badge {
+  position: absolute;
+  right: 4px;
+  bottom: 2px;
+  font-size: 10px;
+  color: #b1b3b8;
+  pointer-events: none;
+}
+
 .card-row {
   display: flex;
   align-items: center;
@@ -333,7 +524,6 @@ async function handleLogin() {
   color: #c0c4cc;
 }
 
-/* 输入框在 large 尺寸下再抬高一点，接近主流后台观感 */
 .card :deep(.el-input__wrapper) {
   height: 44px;
   border-radius: 8px;
@@ -351,7 +541,6 @@ async function handleLogin() {
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* 窄屏：隐藏品牌区，只留卡片 */
 @media (max-width: 900px) {
   .brand { display: none; }
   .panel { flex: 1 1 100%; min-width: 0; }

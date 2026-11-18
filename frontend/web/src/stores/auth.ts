@@ -5,7 +5,7 @@ import { getMyPermissions, getMe, login as loginReq, logout as logoutReq } from 
 import { tokenStore } from '@/api/request'
 import { useDictStore } from '@/stores/dict'
 import { useTabsStore } from '@/stores/tabs'
-import type { PermNode, UserInfo } from '@/types'
+import type { LoginPayload, PermNode, UserInfo } from '@/types'
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<UserInfo | null>(null)
@@ -30,8 +30,8 @@ export const useAuthStore = defineStore('auth', () => {
     useTabsStore().clear()
   }
 
-  async function login(username: string, password: string) {
-    const session = await loginReq(username, password)
+  async function login(payload: LoginPayload) {
+    const session = await loginReq(payload)
     tokenStore.set(session.accessToken, session.refreshToken)
     await loadProfile()
   }
