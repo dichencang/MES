@@ -32,11 +32,11 @@ body,
   width: 160px;
 }
 
-/* 登录页豁免：该页是独立门户样式，输入框为 44px 且不受上面 28px 约束。
+/* 登录页豁免：该页是独立门户样式，输入框 48px 且不受上面 28px 约束。
    必须带 #app 前缀，否则特异性低于上面的 28px 规则而失效。 */
 #app .login-page .el-input__wrapper {
-  height: 44px;
-  min-height: 44px;
+  height: 48px;
+  min-height: 48px;
 }
 
 /* ── 列表页通用结构 ─────────────────────────────────────────
