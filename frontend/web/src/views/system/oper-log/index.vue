@@ -61,7 +61,7 @@ onMounted(load)
           <template #default="{ row }"><el-tag size="small" :type="(row as OperLog).status === '0' ? 'success' : 'danger'">{{ (row as OperLog).status === '0' ? '成功' : '失败' }}</el-tag></template>
         </el-table-column>
         <el-table-column prop="costTime" label="耗时(ms)" width="100" />
-        <el-table-column label="操作时间" width="150">
+        <el-table-column label="操作时间" width="160" show-overflow-tooltip>
           <template #default="{ row }">{{ formatDateTime((row as OperLog).operTime) }}</template>
         </el-table-column>
         <el-table-column label="操作" fixed="right" width="80">
