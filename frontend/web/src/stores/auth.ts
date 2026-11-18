@@ -3,6 +3,8 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { getMyPermissions, getMe, login as loginReq, logout as logoutReq } from '@/api'
 import { tokenStore } from '@/api/request'
+import { useDictStore } from '@/stores/dict'
+import { useTabsStore } from '@/stores/tabs'
 import type { PermNode, UserInfo } from '@/types'
 
 export const useAuthStore = defineStore('auth', () => {
@@ -23,6 +25,9 @@ export const useAuthStore = defineStore('auth', () => {
     navTree.value = []
     loaded.value = false
     tokenStore.clear()
+    // 切账号后不能残留上一个账号的字典与页签
+    useDictStore().clear()
+    useTabsStore().clear()
   }
 
   async function login(username: string, password: string) {

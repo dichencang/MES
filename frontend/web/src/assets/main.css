@@ -14,7 +14,8 @@ body,
   text-align: left;
 }
 
-/* 仅把输入/选择/日期控件调小并统一高度；不影响按钮、表格、分页、行高。
+/* ── 控件尺寸 ───────────────────────────────────────────────
+   仅把输入/选择/日期控件调小并统一高度；不影响按钮、表格、分页、行高。
    用 #app 前缀提高特异性，压过 element-plus 的默认样式（无需 !important）。 */
 #app .el-input__wrapper,
 #app .el-select__wrapper,
@@ -24,15 +25,41 @@ body,
 }
 
 /* 查询区（.search）内所有输入/选择/日期控件统一同宽，消除各页面宽度参差。
-   只作用于查询表单，不影响弹窗、表格内的控件。 */
+   只作用于查询表单，不影响弹窗、表格内的控件。新页面查询区不要写 inline width。 */
 #app .search .el-input,
 #app .search .el-select,
 #app .search .el-date-editor {
   width: 160px;
 }
 
-/* 列表页卡片铺满主内容区：消除数据少时卡片下方的大片灰色空白，分页贴卡片底部。
-   布局壳本身是高度 100vh 的 flex，这里让内容页沿用它。 */
+/* ── 列表页通用结构 ─────────────────────────────────────────
+   .toolbar / .title 原为各页 scoped 样式，现提到全局，页面不必重复写。 */
+#app .toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+#app .toolbar-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+#app .title {
+  font-weight: 600;
+  font-size: 16px;
+}
+#app .search {
+  margin-bottom: 8px;
+}
+/* 查询表单最后一项（按钮组）与其它项对齐，避免换行后错位 */
+#app .search .el-form-item:last-child {
+  margin-right: 0;
+}
+
+/* 卡片铺满主内容区：消除数据少时下方大片灰色空白，分页贴底。
+   布局壳本身是 100vh flex，内容页沿用它。两种结构都支持：
+   ① 页面自己写 <div class="page"><el-card>  ② 直接用 <PageTable>（根即卡片） */
 #app .el-main.main {
   display: flex;
   flex-direction: column;
@@ -43,13 +70,15 @@ body,
   display: flex;
   flex-direction: column;
 }
-#app .el-main.main > .page > .el-card {
+#app .el-main.main > .page > .el-card,
+#app .el-main.main > .page-table {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
 }
-#app .el-main.main > .page > .el-card > .el-card__body {
+#app .el-main.main > .page > .el-card > .el-card__body,
+#app .el-main.main > .page-table > .el-card__body {
   flex: 1;
   min-height: 0;
   display: flex;
@@ -63,4 +92,14 @@ body,
 /* 表格行高适度放松，避免过于紧凑；仍保持单页可展示。 */
 #app .el-table .el-table__cell {
   padding: 11px 0;
+}
+
+/* 行内可编辑单元格（系统参数页） */
+#app .editable {
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 3px;
+}
+#app .editable:hover {
+  background: #ecf5ff;
 }

@@ -1,110 +1,145 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted, nextTick } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+// 样板页：标准列表页写法。新增业务页面照此结构复制即可。
+// 结构 = PageTable（标题/工具栏/查询区/表格/分页）+ useCrud（查询/表单/增改删）+ PERM 常量。
+import { computed, nextTick, onMounted, ref } from 'vue'
+import { ElMessage } from 'element-plus'
+import PageTable from '@/components/common/PageTable.vue'
+import { useCrud } from '@/composables/useCrud'
+import { useAuthStore } from '@/stores/auth'
 import { listConfigs, saveConfig, deleteConfig } from '@/api'
+import { PERM } from '@/constants/perm'
+import { CONFIG_CUSTOM } from '@/constants'
 import type { ConfigItem } from '@/types'
 
-const loading = ref(false)
-const rows = ref<ConfigItem[]>([])
-const query = reactive({ configName: '', configKey: '', page: 1, pageSize: 10 })
-const total = ref(0)
+const auth = useAuthStore()
+const canUpdate = computed(() => auth.hasPerm(PERM.config.update))
 
-const dialogVisible = ref(false)
-const editing = ref(false)
-const form = reactive({ configName: '', configKey: '', configValue: '', remark: '' })
+const {
+  loading, rows, total, query,
+  dialogVisible, editing, submitting, form,
+  load, search, resetQuery, openCreate, submit, remove,
+} = useCrud<ConfigItem>({
+  fetch: listConfigs,
+  defaultQuery: () => ({ configName: '', configKey: '' }),
+  defaultForm: () => ({ configName: '', configKey: '', configValue: '', remark: '' }),
+  create: (data) => saveConfig(data),
+  update: (id, data) => saveConfig(data, id),
+  remove: deleteConfig,
+  // 新增带 configKey，编辑只提交可变字段（参数键建后不可改）
+  toPayload: (f, isEdit) => ({
+    configName: f.configName,
+    configValue: f.configValue,
+    remark: f.remark || null,
+    ...(isEdit ? {} : { configKey: f.configKey }),
+  }),
+  describe: (row) => row.configName,
+})
+
+// 参数值行内编辑（需 system:config:update）
 const editingCell = ref<string | null>(null)
 const cellValue = ref('')
-const inputRef = ref()
-
-async function load() {
-  loading.value = true
-  try {
-    const params: Record<string, unknown> = { page: query.page, pageSize: query.pageSize }
-    if (query.configName) params.configName = query.configName
-    if (query.configKey) params.configKey = query.configKey
-    const res = await listConfigs(params); rows.value = res.list; total.value = res.total
-  } finally { loading.value = false }
-}
-function openCreate() { editing.value = false; Object.assign(form, { configName: '', configKey: '', configValue: '', remark: '' }); dialogVisible.value = true }
-async function submit() {
-  const payload: Record<string, unknown> = { configName: form.configName, configValue: form.configValue, remark: form.remark || null }
-  if (!editing.value) payload.configKey = form.configKey
-  await saveConfig(payload, undefined)
-  ElMessage.success('已创建'); dialogVisible.value = false; load()
-}
-async function remove(row: ConfigItem) {
-  await ElMessageBox.confirm(`确认删除参数「${row.configName}」？内置参数不可删除。`, '提示', { type: 'warning' })
-  await deleteConfig(row.id); ElMessage.success('已删除'); load()
-}
+const inputRef = ref<{ focus: () => void }>()
 
 async function startEdit(row: ConfigItem) {
-  editingCell.value = row.id; cellValue.value = row.configValue
-  await nextTick(); inputRef.value?.focus()
+  if (!canUpdate.value) return
+  editingCell.value = row.id
+  cellValue.value = row.configValue
+  await nextTick()
+  inputRef.value?.focus()
 }
+
 async function commitEdit(row: ConfigItem) {
   if (editingCell.value !== row.id) return
   editingCell.value = null
-  if (cellValue.value !== row.configValue) {
-    await saveConfig({ configValue: cellValue.value }, row.id)
-    ElMessage.success('已更新'); load()
-  }
+  if (cellValue.value === row.configValue) return
+  await saveConfig({ configValue: cellValue.value }, row.id)
+  ElMessage.success('已更新')
+  load()
 }
+
 onMounted(load)
 </script>
 
 <template>
-  <div class="page">
-    <el-card>
-      <template #header><div class="toolbar"><span class="title">系统参数</span>
-        <el-button v-perm="'system:config:create'" type="primary" @click="openCreate">新增参数</el-button>
-      </div></template>
+  <PageTable
+    title="系统参数"
+    :data="rows"
+    :loading="loading"
+    :total="total"
+    v-model:page="query.page"
+    v-model:page-size="query.pageSize"
+    @change="load"
+  >
+    <template #toolbar>
+      <el-button v-perm="PERM.config.create" type="primary" @click="openCreate">新增参数</el-button>
+    </template>
+
+    <template #search>
       <el-form :inline="true" :model="query" class="search">
-        <el-form-item label="参数名"><el-input v-model="query.configName" placeholder="参数名" clearable /></el-form-item>
-        <el-form-item label="参数键"><el-input v-model="query.configKey" placeholder="参数键" clearable /></el-form-item>
-        <el-form-item><el-button type="primary" @click="query.page = 1; load()">查询</el-button><el-button @click="Object.assign(query, { configName: '', configKey: '', page: 1 }); load()">重置</el-button></el-form-item>
+        <el-form-item label="参数名">
+          <el-input v-model="query.configName" placeholder="参数名" clearable @keyup.enter="search" />
+        </el-form-item>
+        <el-form-item label="参数键">
+          <el-input v-model="query.configKey" placeholder="参数键" clearable @keyup.enter="search" />
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" @click="search">查询</el-button>
+          <el-button @click="resetQuery">重置</el-button>
+        </el-form-item>
       </el-form>
-      <el-table :data="rows" v-loading="loading" border stripe>
-        <el-table-column prop="configName" label="参数名" width="160" />
-        <el-table-column prop="configKey" label="参数键" min-width="180" />
-        <el-table-column label="参数值" min-width="220">
-          <template #default="{ row }">
-            <el-input v-if="editingCell === (row as ConfigItem).id" ref="inputRef" v-model="cellValue" size="small"
-              @blur="commitEdit(row as ConfigItem)" @keyup.enter="commitEdit(row as ConfigItem)" />
-            <span v-else @click="startEdit(row as ConfigItem)" class="editable">{{ (row as ConfigItem).configValue }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="类型" width="90">
-          <template #default="{ row }"><el-tag size="small" :type="(row as ConfigItem).configType === '0' ? 'warning' : 'info'">{{ (row as ConfigItem).configType === '0' ? '内置' : '自定义' }}</el-tag></template>
-        </el-table-column>
-        <el-table-column prop="remark" label="备注" min-width="140" />
-        <el-table-column label="操作" width="90">
-          <template #default="{ row }">
-            <el-button v-if="(row as ConfigItem).configType === '1'" v-perm="'system:config:delete'" link type="danger" @click="remove(row as ConfigItem)">删除</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-      <el-pagination v-model:current-page="query.page" v-model:page-size="query.pageSize" :total="total"
-        :page-sizes="[10, 20, 50, 100]" layout="total, sizes, prev, pager, next"
-        style="margin-top: 16px; justify-content: flex-end" @current-change="load" @size-change="load" />
-    </el-card>
+    </template>
 
-    <el-dialog v-model="dialogVisible" title="新增参数" width="480px">
-      <el-form :model="form" label-width="80px">
-        <el-form-item label="参数名"><el-input v-model="form.configName" /></el-form-item>
-        <el-form-item label="参数键"><el-input v-model="form.configKey" /></el-form-item>
-        <el-form-item label="参数值"><el-input v-model="form.configValue" /></el-form-item>
-        <el-form-item label="备注"><el-input v-model="form.remark" type="textarea" /></el-form-item>
-      </el-form>
-      <template #footer><el-button @click="dialogVisible = false">取消</el-button><el-button type="primary" @click="submit">确定</el-button></template>
-    </el-dialog>
-  </div>
+    <el-table-column prop="configName" label="参数名" width="180" />
+    <el-table-column prop="configKey" label="参数键" min-width="200" />
+    <el-table-column label="参数值" min-width="240">
+      <template #default="{ row }">
+        <el-input
+          v-if="editingCell === (row as ConfigItem).id"
+          ref="inputRef"
+          v-model="cellValue"
+          size="small"
+          @blur="commitEdit(row as ConfigItem)"
+          @keyup.enter="commitEdit(row as ConfigItem)"
+        />
+        <span v-else-if="canUpdate" class="editable" @click="startEdit(row as ConfigItem)">
+          {{ (row as ConfigItem).configValue }}
+        </span>
+        <span v-else>{{ (row as ConfigItem).configValue }}</span>
+      </template>
+    </el-table-column>
+    <el-table-column label="类型" width="90">
+      <template #default="{ row }">
+        <el-tag size="small" :type="(row as ConfigItem).configType === '0' ? 'warning' : 'info'">
+          {{ (row as ConfigItem).configType === '0' ? '内置' : '自定义' }}
+        </el-tag>
+      </template>
+    </el-table-column>
+    <el-table-column prop="remark" label="备注" min-width="140" show-overflow-tooltip />
+    <el-table-column label="操作" width="90" fixed="right">
+      <template #default="{ row }">
+        <el-button
+          v-if="(row as ConfigItem).configType === CONFIG_CUSTOM"
+          v-perm="PERM.config.delete"
+          link
+          type="danger"
+          @click="remove(row as ConfigItem)"
+        >
+          删除
+        </el-button>
+      </template>
+    </el-table-column>
+  </PageTable>
+
+  <el-dialog v-model="dialogVisible" :title="editing ? '编辑参数' : '新增参数'" width="480px">
+    <el-form :model="form" label-width="80px">
+      <el-form-item label="参数名"><el-input v-model="form.configName" /></el-form-item>
+      <el-form-item label="参数键"><el-input v-model="form.configKey" :disabled="editing" placeholder="建后不可修改" /></el-form-item>
+      <el-form-item label="参数值"><el-input v-model="form.configValue" /></el-form-item>
+      <el-form-item label="备注"><el-input v-model="form.remark" type="textarea" :rows="3" /></el-form-item>
+    </el-form>
+    <template #footer>
+      <el-button @click="dialogVisible = false">取消</el-button>
+      <el-button type="primary" :loading="submitting" @click="submit">确定</el-button>
+    </template>
+  </el-dialog>
 </template>
-
-<style scoped>
-.page, .toolbar { width: 100%; }
-.toolbar { display: flex; justify-content: space-between; align-items: center; }
-.title { font-weight: 600; font-size: 16px; }
-.search { margin-bottom: 8px; }
-.editable { cursor: pointer; padding: 4px 6px; border-radius: 3px; }
-.editable:hover { background: #ecf5ff; }
-</style>

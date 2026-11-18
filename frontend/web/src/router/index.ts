@@ -1,8 +1,10 @@
-// 路由：静态路由（登录/404）+ 动态路由（按 /permissions/my 的 tree 生成）。
+// 路由：静态路由（登录/403/404）+ 动态路由（按 /permissions/my 的 tree 生成）。
 // component 字符串由后端下发，相对 views 省略扩展名；未知组件渲染占位页不白屏。
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useTabsStore } from '@/stores/tabs'
 import { tokenStore } from '@/api/request'
+import { APP_TITLE } from '@/constants'
 
 const modules = import.meta.glob('@/views/**/*.vue')
 
@@ -15,14 +17,16 @@ function resolveComponent(component: string) {
 }
 
 const staticRoutes: RouteRecordRaw[] = [
-  { path: '/login', name: 'Login', component: () => import('@/views/login/index.vue'), meta: { public: true } },
-  { path: '/403', name: 'Forbidden', component: () => import('@/views/error/403.vue'), meta: { public: true } },
-  { path: '/:pathMatch(.*)*', name: 'NotFound', component: () => import('@/views/error/404.vue') },
+  { path: '/login', name: 'Login', component: () => import('@/views/login/index.vue'), meta: { public: true, title: '登录' } },
+  { path: '/403', name: 'Forbidden', component: () => import('@/views/error/403.vue'), meta: { public: true, title: '无权访问' } },
+  { path: '/:pathMatch(.*)*', name: 'NotFound', component: () => import('@/views/error/404.vue'), meta: { title: '页面不存在' } },
 ]
 
 export const router = createRouter({
   history: createWebHistory(),
   routes: staticRoutes,
+  // 切换页面回到顶部，避免长列表页残留滚动位置
+  scrollBehavior: () => ({ top: 0 }),
 })
 
 const DYNAMIC_ROUTE_NAME = 'Layout'
@@ -48,7 +52,7 @@ export function addDynamicRoutes(): string {
           meta: { title: n.permName, permCode: n.permissionCode, icon: n.icon ?? undefined },
         })
       }
-      if (n.children.length) collect(n.children)
+      if (n.children?.length) collect(n.children)
     }
   }
   collect(auth.navTree)
@@ -70,7 +74,7 @@ export function addDynamicRoutes(): string {
 function firstPath(nodes: ReturnType<typeof useAuthStore>['navTree']): string {
   for (const n of nodes) {
     if (n.permType === 'MENU' && n.path) return n.path
-    const sub = firstPath(n.children)
+    const sub = firstPath(n.children ?? [])
     if (sub) return sub
   }
   return '/403'
@@ -94,10 +98,16 @@ router.beforeEach(async (to) => {
   return true
 })
 
-// 会话失效事件：清状态并跳登录
+router.afterEach((to) => {
+  const title = (to.meta.title as string) || ''
+  document.title = title ? `${title} · ${APP_TITLE}` : APP_TITLE
+})
+
+// 会话失效事件：清状态、清页签并跳登录
 window.addEventListener('mes:unauthorized', () => {
   const auth = useAuthStore()
   auth.reset()
+  useTabsStore().clear()
   dynamicAdded = false
   if (router.currentRoute.value.path !== '/login') router.push('/login')
 })
