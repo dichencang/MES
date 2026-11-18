@@ -59,7 +59,7 @@ export function addDynamicRoutes(): string {
       name: DYNAMIC_ROUTE_NAME,
       component: () => import('@/layout/index.vue'),
       children: [
-        { path: '', redirect: children[0]?.path as string },
+        { path: '', name: 'LayoutHome', redirect: children[0]?.path as string },
         ...children,
       ],
     })
