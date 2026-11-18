@@ -244,7 +244,9 @@ onUnmounted(clearCountdown)
   align-items: center;
   justify-content: center;
   padding: 32px 16px;
-  background: radial-gradient(1200px 800px at 50% -10%, #16283c 0%, #0d1a28 46%, #0a1520 100%);
+  background: #f2f4f8;
+  /* 有背景图时：把上一行换成下面这行，图放到 web/src/assets/login-bg.jpg 即可（遮罩保证文字与卡片可读）
+     background: linear-gradient(rgba(10, 21, 32, 0.45), rgba(10, 21, 32, 0.65)), url('@/assets/login-bg.jpg') center/cover no-repeat; */
 }
 .center {
   width: 100%;
@@ -256,7 +258,7 @@ onUnmounted(clearCountdown)
   padding: 32px 36px 28px;
   border-radius: 14px;
   background: #ffffff;
-  box-shadow: 0 24px 60px rgba(3, 12, 22, 0.45), 0 2px 8px rgba(3, 12, 22, 0.3);
+  box-shadow: 0 12px 32px rgba(15, 42, 74, 0.1), 0 2px 6px rgba(15, 42, 74, 0.06);
   animation: enter 0.4s cubic-bezier(0.22, 0.8, 0.3, 1) both;
 }
 .brand {
@@ -396,7 +398,7 @@ onUnmounted(clearCountdown)
   margin: 18px 0 0;
   font-size: 12px;
   text-align: center;
-  color: rgba(190, 208, 228, 0.45);
+  color: #a8b0bd;
 }
 
 .card :deep(.el-input__wrapper) {
