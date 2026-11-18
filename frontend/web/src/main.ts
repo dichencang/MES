@@ -19,6 +19,6 @@ for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
 
 app.use(createPinia())
 app.use(router)
-app.use(ElementPlus, { locale: zhCn, size: 'small' })
+app.use(ElementPlus, { locale: zhCn })
 app.directive('perm', permDirective)
 app.mount('#app')

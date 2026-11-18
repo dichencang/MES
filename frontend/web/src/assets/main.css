@@ -13,3 +13,12 @@ body,
   font-weight: normal;
   text-align: left;
 }
+
+/* 仅把输入/选择/日期控件调小并统一高度；不影响按钮、表格、分页、行高。
+   用 #app 前缀提高特异性，压过 element-plus 的默认样式（无需 !important）。 */
+#app .el-input__wrapper,
+#app .el-select__wrapper,
+#app .el-range-editor {
+  height: 28px;
+  min-height: 28px;
+}
