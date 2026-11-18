@@ -309,8 +309,8 @@ onUnmounted(clearCountdown)
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+    linear-gradient(rgba(255, 255, 255, 0.026) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.026) 1px, transparent 1px);
   background-size: 44px 44px;
   mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.85), transparent 78%);
 }
@@ -455,18 +455,23 @@ onUnmounted(clearCountdown)
 .captcha-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
   width: 100%;
 }
-/* 4 位验证码不需要占满整行：固定 150px，把空间留给右侧图片 */
+/* 输入框回到"占满剩余宽度"，保证与上面两行右边缘对齐；
+   4 位码居中 + 加大字距，宽框里就不显得空 */
 .captcha-row .el-input {
-  flex: 0 0 150px;
+  flex: 1;
+  min-width: 0;
+}
+.captcha-row :deep(.el-input__inner) {
+  text-align: center;
+  letter-spacing: 3px;
 }
 .captcha-img {
   position: relative;
   flex: none;
-  width: 150px;
+  width: 144px;
   height: 44px;
   padding: 0;
   border: 1px solid #dcdfe6;
@@ -502,7 +507,7 @@ onUnmounted(clearCountdown)
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin: -4px 0 18px;
+  margin: 2px 0 16px;
 }
 .submit {
   width: 100%;
