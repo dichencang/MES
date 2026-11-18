@@ -35,8 +35,10 @@ async function handleLogin() {
     if (remember.value) localStorage.setItem(REMEMBER_KEY, form.username)
     else localStorage.removeItem(REMEMBER_KEY)
     const home = addDynamicRoutes()
+    // redirect 只在指向具体页面时采用；'/' 要靠 Layout 子路由重定向，易在重建时序里落 404，故一律回首页
     const redirect = route.query.redirect as string | undefined
-    await router.replace(redirect || home)
+    const target = redirect && redirect !== '/' && redirect !== '/login' ? redirect : home
+    await router.replace(target)
   } catch {
     ElMessage.error('登录失败，请检查账号或密码')
   } finally {

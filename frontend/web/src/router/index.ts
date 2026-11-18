@@ -30,15 +30,16 @@ export const router = createRouter({
 })
 
 const DYNAMIC_ROUTE_NAME = 'Layout'
-let dynamicAdded = false
 
-/** 依据权限树注册动态路由。返回首页路径供登录后跳转 */
+/**
+ * 依据权限树注册动态路由。**幂等**：每次先移除旧的再重建。
+ * 早期用模块级 dynamicAdded 做「只注册一次」的标记，一旦标记为 true 而路由实际已被移除
+ * （HMR、会话切换、异常中断），登录后会落到 catch-all 的 404——因此改为以 router.hasRoute 为准。
+ * 返回首页路径供登录后跳转。
+ */
 export function addDynamicRoutes(): string {
   const auth = useAuthStore()
-  if (dynamicAdded) return firstPath(auth.navTree)
-  // 重新登录时先移除旧的动态路由，避免同名冲突
   if (router.hasRoute(DYNAMIC_ROUTE_NAME)) router.removeRoute(DYNAMIC_ROUTE_NAME)
-  dynamicAdded = true
 
   const children: RouteRecordRaw[] = []
   const collect = (nodes: typeof auth.navTree) => {
@@ -108,7 +109,6 @@ window.addEventListener('mes:unauthorized', () => {
   const auth = useAuthStore()
   auth.reset()
   useTabsStore().clear()
-  dynamicAdded = false
   if (router.currentRoute.value.path !== '/login') router.push('/login')
 })
 
