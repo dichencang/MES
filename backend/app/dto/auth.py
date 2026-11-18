@@ -19,6 +19,8 @@ class AuthBody(BaseModel):
 class Login(AuthBody):
     username: str = Field(min_length=1, max_length=64)
     password: Password
+    captchaId: str = Field(min_length=1, max_length=128)
+    captchaCode: str = Field(pattern=r"^[A-Za-z0-9]{4}$")
 
 
 class Refresh(AuthBody):

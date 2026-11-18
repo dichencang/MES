@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from redis.asyncio import Redis
 
 from app.config.database import engine
 from app.config.settings import settings
@@ -19,8 +20,14 @@ from app.utils.responses import ApiError, api_error_handler, validation_error_ha
 @asynccontextmanager
 async def lifespan(app):
     secret()
-    yield
-    await engine.dispose()
+    async with Redis.from_url(
+        settings().redis_url.get_secret_value(), socket_connect_timeout=2, socket_timeout=2,
+    ) as redis:
+        app.state.redis = redis
+        try:
+            yield
+        finally:
+            await engine.dispose()
 
 
 app = FastAPI(title="MES 后端", lifespan=lifespan)

@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config.database import database_session
 from app.dto.auth import Login, Refresh
 from app.models import system as m
-from app.services import auth
+from app.services import auth, captcha
 from app.services.audit import AuditRoute
 from app.utils.responses import ApiError, success
 
@@ -30,8 +30,17 @@ async def current_account(
 Account = Annotated[dict, Depends(current_account)]
 
 
+@router.get("/captcha")
+async def get_captcha(request: Request, response: Response):
+    client_ip = request.client.host if request.client else "unknown"
+    data = await captcha.issue(request.app.state.redis, client_ip)
+    response.headers["Cache-Control"] = "no-store"
+    return success(data)
+
+
 @router.post("/login")
 async def login(body: Login, db: Db, request: Request):
+    await captcha.verify(request.app.state.redis, body.captchaId, body.captchaCode)
     async with db.begin():
         tokens = await auth.login(db, body)
         id = await db.scalar(select(m.user.c.id).where(m.user.c.username == body.username))

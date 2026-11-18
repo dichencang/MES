@@ -1,5 +1,5 @@
 from sqlalchemy import (
-    BigInteger, CHAR, CheckConstraint, Column, DateTime, ForeignKey, Index,
+    BigInteger, Boolean, CHAR, CheckConstraint, Column, DateTime, ForeignKey, Index,
     Integer, MetaData, String, Table, Text, UniqueConstraint, func,
 )
 
@@ -109,6 +109,7 @@ user_session = entity(
     Column("refresh_token_hash", String(64), nullable=False, unique=True),
     timestamp("expires_at", default=False),
     timestamp("revoked_at", nullable=True, default=False),
+    Column("rotated", Boolean, nullable=False, server_default="false"),
     timestamp("created_at"),
     timestamp("last_used_at", nullable=True, default=False),
 )

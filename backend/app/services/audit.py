@@ -13,7 +13,10 @@ MODULE_NAMES = {
     "depts": "组织架构", "dict-types": "数据字典", "dict-data": "数据字典",
     "configs": "系统参数", "oper-logs": "操作日志", "auth": "认证",
 }
-SECRET_KEYS = {"password", "oldpassword", "newpassword", "refreshtoken", "accesstoken", "authorization"}
+SECRET_KEYS = {
+    "password", "oldpassword", "newpassword", "refreshtoken", "accesstoken", "authorization",
+    "captchaid", "captchacode",
+}
 
 
 def redact(value):
