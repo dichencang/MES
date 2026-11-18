@@ -398,15 +398,35 @@ onUnmounted(clearCountdown)
 
 /* ── 右侧登录卡片 ───────────────────────────────────── */
 .panel {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   flex: 0 1 48%;
   min-width: 380px;
   padding: 40px 24px;
-  background: #f5f7fa;
+  overflow: hidden;
+  /* 浅色分层：两处柔光 + 自上而下的极浅渐变，与左侧深色区形成明暗呼应 */
+  background:
+    radial-gradient(820px 560px at 104% -8%, rgba(64, 158, 255, 0.14), transparent 68%),
+    radial-gradient(620px 480px at -6% 106%, rgba(79, 155, 245, 0.1), transparent 68%),
+    linear-gradient(180deg, #f7fafe 0%, #eef3fa 100%);
+  /* 与左侧深色区分界处一条极细的过渡线，避免生硬切断 */
+  box-shadow: inset 1px 0 0 rgba(15, 42, 74, 0.06);
+}
+/* 点阵纹理：中心清晰、四周渐隐，给纯色留白一点质感，不干扰表单 */
+.panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(15, 42, 74, 0.07) 1px, transparent 1px);
+  background-size: 22px 22px;
+  mask-image: radial-gradient(circle at 52% 46%, #000 0%, transparent 72%);
+  pointer-events: none;
 }
 .card {
+  position: relative;
+  z-index: 1;
   width: 100%;
   max-width: 400px;
   padding: 40px 36px 28px;
