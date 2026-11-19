@@ -27,6 +27,16 @@ let seq = 0
 let countdown: number | undefined
 let countdownLeft = 0
 
+// 页面根节点必须有确定高度，flex:1 才有参照：取窗口可用高度（px）
+const pageHeight = ref(0)
+const statusBarHeight = ref(0)
+function measure(): void {
+  const info = uni.getSystemInfoSync()
+  const h = (info.windowHeight as number) || 0
+  pageHeight.value = h > 0 ? h + 'px' : ''
+  statusBarHeight.value = (info.statusBarHeight as number) || 0
+}
+
 function stopCountdown(): void {
   if (countdown) clearInterval(countdown)
   countdown = undefined
@@ -146,6 +156,7 @@ async function handleLogin(): Promise<void> {
 }
 
 onLoad(() => {
+  measure()
   loadCaptcha()
 })
 
@@ -155,7 +166,15 @@ onUnload(() => {
 </script>
 
 <template>
-  <view class="page">
+  <view class="page" :style="pageHeight ? 'height:' + pageHeight : ''">
+    <!-- 自绘状态栏占位：navigationStyle=custom 后必须自己避开状态栏，否则内容会顶到刘海/时间下面 -->
+    <view :style="'height:' + statusBarHeight + 'px'"></view>
+
+    <!-- 自绘标题栏：比系统 56dp 矮，只保留下"登录"标识 -->
+    <view class="self-nav">
+      <text class="self-nav-title">登录</text>
+    </view>
+
     <view class="brand">
       <view class="logo">MES</view>
       <view class="brand-copy">
@@ -204,14 +223,12 @@ onUnload(() => {
       </view>
 
       <view class="remember-row" @click="remember = !remember">
-        <view v-if="remember" class="checkbox checked"></view>
-        <view v-else class="checkbox"></view>
+        <view :class="remember ? 'checkbox checked' : 'checkbox'"></view>
         <text class="remember-text">记住账号</text>
       </view>
-
-      <button class="submit" :disabled="loading" @click="handleLogin">
-        {{ loading ? '登录中…' : '登 录' }}
-      </button>
+      <view class="submit" @click="handleLogin">
+        <text class="submit-text">{{ loading ? '登录中…' : '登 录' }}</text>
+      </view>
 
       <view class="dev-tip">
         <text class="dev-tip-text">开发环境种子账号：admin / admin123</text>
@@ -223,15 +240,25 @@ onUnload(() => {
 <style>
 /* uvue CSS 受限子集：只支持 classname 选择器、display 仅 flex/none、无 100vh / 角度渐变 / gap */
 .page {
-  flex: 1;
-  justify-content: center;
   background: linear-gradient(to bottom, #edf5ff 0%, #f8fbff 42%, #e7f1ff 100%);
-  padding: 18px 20px 16px;
+  padding: 10px 20px 16px;
+}
+/* 自绘标题栏：44px 比系统导航栏（56dp+）矮，只承担"登录"标识 */
+.self-nav {
+  height: 44px;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+}
+.self-nav-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: #1f2d3d;
 }
 .brand {
   flex-direction: row;
   align-items: center;
-  padding: 2px 4px 14px;
+  padding: 6px 4px 16px;
 }
 .logo {
   width: 40px;
@@ -338,18 +365,21 @@ onUnload(() => {
   font-size: 13px;
   color: #5e7695;
 }
+/* 用 view 自绘按钮：uvue 的 button 是原生组件，自带内边距/最小高度，和外设 height 冲突 */
 .submit {
   width: 100%;
-  height: 48px;
-  border: 0;
+  height: 46px;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
   border-radius: 10px;
   background: linear-gradient(to right, #3299f8 0%, #2878ec 55%, #315be0 100%);
+}
+.submit-text {
   color: #ffffff;
   font-size: 16px;
   font-weight: 600;
   letter-spacing: 2px;
-  line-height: 48px;
-  text-align: center;
 }
 .dev-tip {
   margin-top: 14px;
