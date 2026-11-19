@@ -1,0 +1,157 @@
+<script setup lang="ts">
+// 落地页：登录后的最小闭环。展示用户快照 + 规划中的 5 个模块入口（暂为占位）。
+// 后续按契约逐模块替换为真实页面，不在此堆业务代码。
+import { logout } from '../../api/auth'
+import { tokenStore, profileStore } from '../../utils/auth'
+import type { UserInfo } from '../../types'
+
+const user = ref<UserInfo | null>(profileStore.getUser())
+
+const entries = [
+  { key: 'home', name: '首页', desc: '生产总览与快捷入口' },
+  { key: 'exception', name: '异常', desc: '异常上报与处理' },
+  { key: 'workbench', name: '工作台', desc: '扫码报工与质检' },
+  { key: 'todo', name: '待办', desc: '我的待处理任务' },
+  { key: 'mine', name: '我的', desc: '个人信息与设置' },
+]
+
+const rolesText = computed(() => {
+  if (!user.value) return '—'
+  return user.value.roles.map((r) => r.roleName).join('、') || '—'
+})
+
+function openEntry(name: string): void {
+  uni.showToast({ title: name + '：模块待开发', icon: 'none' })
+}
+
+async function handleLogout(): Promise<void> {
+  try {
+    await logout()
+  } catch (error) {
+    // 请求层已提示；退出接口失败也要清本地会话
+  }
+  tokenStore.clear()
+  profileStore.clear()
+  uni.reLaunch({ url: '/pages/login/index' })
+}
+
+onLoad(() => {
+  if (!tokenStore.access) {
+    uni.reLaunch({ url: '/pages/login/index' })
+  }
+})
+</script>
+
+<template>
+  <view class="page">
+    <view class="hero">
+      <text class="hello">你好，{{ user ? user.realName : '用户' }}</text>
+      <text class="meta">{{ user && user.deptName ? user.deptName : '未分配部门' }} · {{ rolesText }}</text>
+    </view>
+
+    <view class="section-title">功能入口</view>
+    <view class="grid">
+      <view v-for="item in entries" :key="item.key" class="entry" @click="openEntry(item.name)">
+        <view class="entry-mark">{{ item.name.slice(0, 1) }}</view>
+        <text class="entry-name">{{ item.name }}</text>
+        <text class="entry-desc">{{ item.desc }}</text>
+      </view>
+    </view>
+
+    <view class="footer-info">
+      <text class="footer-text">后端接口已连通 · 业务模块待开发</text>
+    </view>
+
+    <button class="logout" @click="handleLogout">退出登录</button>
+  </view>
+</template>
+
+<style>
+/* uvue CSS 受限子集：只支持 classname 选择器、display 仅 flex/none、无 100vh / 角度渐变 / gap / calc */
+.page {
+  background: #f4f7fb;
+  padding: 24px 16px;
+}
+.hero {
+  background: linear-gradient(to bottom right, #2f6fe4, #4a8cf7);
+  border-radius: 16px;
+  padding: 22px 18px;
+  margin-bottom: 22px;
+}
+.hello {
+  display: flex;
+  color: #ffffff;
+  font-size: 20px;
+  font-weight: 700;
+}
+.meta {
+  display: flex;
+  margin-top: 8px;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 12px;
+}
+.section-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1f2d3d;
+  margin-bottom: 12px;
+}
+.grid {
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+.entry {
+  width: 48%;
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 16px 14px;
+  margin-bottom: 12px;
+  box-shadow: 0 4px 14px rgba(52, 105, 176, 0.06);
+}
+.entry-mark {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: #eaf3ff;
+  color: #2f6fe4;
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+  line-height: 32px;
+  margin-bottom: 10px;
+}
+.entry-name {
+  display: flex;
+  font-size: 14px;
+  font-weight: 600;
+  color: #263b55;
+}
+.entry-desc {
+  display: flex;
+  margin-top: 4px;
+  font-size: 11px;
+  color: #94a3b8;
+  line-height: 1.5;
+}
+.footer-info {
+  margin-top: 20px;
+  text-align: center;
+}
+.footer-text {
+  font-size: 11px;
+  color: #a8b4c4;
+}
+.logout {
+  width: 100%;
+  height: 44px;
+  margin-top: 24px;
+  border: 1px solid #e1e8f1;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #6b7c93;
+  font-size: 14px;
+  line-height: 44px;
+  text-align: center;
+}
+</style>
