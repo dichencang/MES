@@ -31,8 +31,9 @@ const stats = [
   { key: 'outbound', label: '出库', value: '—' },
 ]
 
-// 工作台功能入口目录
-const workGroups = [
+// 工作台功能入口目录（需求真源分组）
+type WorkItem = { key: string; name: string }
+const workGroups: Array<{ key: string; title: string; items: WorkItem[] }> = [
   {
     key: 'plan',
     title: '计划管理',
@@ -96,13 +97,20 @@ const deptText = computed(() => {
 })
 
 // 页面高度：uvue 根节点需确定高度，flex:1 才有参照
+// scrollHeight = 一屏高 - 状态栏 - 标题栏(44) - 底部 Tab(54)
+// scroll-view 在 uvue 里不吃 flex:1，必须给明确高度，否则会把 Tab 栏挤出屏幕
 const pageHeight = ref(0)
+const scrollHeight = ref(0)
 const statusBarHeight = ref(0)
+const NAV_H = 44
+const TAB_H = 54
 function measure(): void {
   const info = uni.getSystemInfoSync()
   const h = (info.windowHeight as number) || 0
+  const sb = (info.statusBarHeight as number) || 0
+  statusBarHeight.value = sb
   pageHeight.value = h > 0 ? h + 'px' : ''
-  statusBarHeight.value = (info.statusBarHeight as number) || 0
+  scrollHeight.value = h > 0 ? h - sb - NAV_H - TAB_H + 'px' : ''
 }
 
 function switchTab(key: string): void {
@@ -146,7 +154,7 @@ onReady(() => {
       <text class="nav-title">{{ currentTabName }}</text>
     </view>
 
-    <scroll-view class="body" scroll-y="true">
+    <scroll-view class="body" scroll-y="true" :style="scrollHeight ? 'height:' + scrollHeight : ''">
       <!-- ===== 首页：问候 + 统计卡片 + 工单环形图 ===== -->
       <view v-if="activeTab === 'home'" class="pane">
         <view class="hero">
@@ -192,14 +200,13 @@ onReady(() => {
         </view>
       </view>
 
-      <!-- ===== 工作台：功能入口目录 ===== -->
+      <!-- ===== 工作台：功能入口目录（横向网格，短名称竖排浪费空间） ===== -->
       <view v-if="activeTab === 'workbench'" class="pane">
         <view v-for="g in workGroups" :key="g.key" class="group">
           <text class="group-title">{{ g.title }}</text>
-          <view class="group-items">
-            <view v-for="it in g.items" :key="it.key" class="group-item" @click="openPage(it.name)">
-              <text class="group-item-text">{{ it.name }}</text>
-              <text class="group-item-arrow">›</text>
+          <view class="group-grid">
+            <view v-for="it in g.items" :key="it.key" class="group-cell" @click="openPage(it.name)">
+              <text class="group-cell-text">{{ it.name }}</text>
             </view>
           </view>
         </view>
@@ -418,35 +425,38 @@ onReady(() => {
   color: #a8b4c4;
 }
 
-/* 工作台 */
+/* 工作台：分组卡片 + 三列网格。用 space-between 而不是 margin-right，
+   否则 31.5%*3 + 2.75%*3 = 102.75% 超宽，第三列必被挤到下一行。 */
 .group {
-  margin-bottom: 14px;
+  margin-bottom: 12px;
   background: #ffffff;
   border-radius: 12px;
-  padding: 14px 14px 6px;
+  padding: 14px 14px 4px;
 }
 .group-title {
   font-size: 13px;
   font-weight: 600;
   color: #8a98aa;
 }
-.group-items {
-  margin-top: 6px;
+.group-grid {
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  margin-top: 10px;
 }
-.group-item {
+.group-cell {
+  width: 31.5%;
+  height: 42px;
   flex-direction: row;
   align-items: center;
-  justify-content: space-between;
-  padding: 12px 0;
-  border-top: 1px solid #f2f5f9;
+  justify-content: center;
+  border-radius: 8px;
+  background: #f5f8fd;
+  margin-bottom: 10px;
 }
-.group-item-text {
-  font-size: 14px;
+.group-cell-text {
+  font-size: 13px;
   color: #263b55;
-}
-.group-item-arrow {
-  font-size: 15px;
-  color: #c4cfdd;
 }
 
 /* 异常 */
