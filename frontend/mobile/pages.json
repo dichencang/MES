@@ -22,5 +22,11 @@
 		"navigationBarBackgroundColor": "#FFFFFF",
 		"backgroundColor": "#F4F7FB"
 	},
+	"easycom": {
+		"autoscan": true,
+		"custom": {
+			"^uvx-(.*)": "@/uni_modules/uvx-ui/components/uvx-$1/uvx-$1.uvue"
+		}
+	},
 	"uniIdRouter": {}
 }

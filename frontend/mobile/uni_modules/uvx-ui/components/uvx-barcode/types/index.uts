@@ -1,0 +1,78 @@
+/** 条形码绘制配置。 */
+export type Options = {
+   margin?: number;
+   quietZone?: number;
+   showText?: boolean;
+   displayText?: string;
+   fontSize?: number;
+   textMargin?: number;
+   foregroundColor?: string;
+   backgroundColor?: string;
+   textColor?: string;
+};
+
+/** 应用默认值后的条形码绘制配置。 */
+export type ResolvedOptions = {
+   margin: number;
+   quietZone: number;
+   showText: boolean;
+   displayText: string;
+   fontSize: number;
+   textMargin: number;
+   foregroundColor: string;
+   backgroundColor: string;
+   textColor: string;
+};
+
+/** 组件属性。 */
+export type Props = {
+   value?: string | number;
+   gs1?: boolean;
+   options?: Options;
+   width?: string | number;
+   height?: string | number;
+   start?: boolean;
+   auto?: boolean;
+   hide?: boolean;
+   loading?: boolean;
+   h5SaveTip?: boolean;
+   uStyle?: string;
+   uClass?: string;
+};
+
+/** CODE128 编码结果。 */
+export type BarcodeResult = {
+   codewords: number[];
+   modules: boolean[];
+   checksum: number;
+   displayText: string;
+};
+
+/** Canvas 绘制指标。 */
+export type RenderMetrics = {
+   pixelRatio: number;
+   canvasWidth: number;
+   canvasHeight: number;
+   moduleWidth: number;
+   barHeight: number;
+   quietZone: number;
+};
+
+/** 公开实例快照。 */
+export type Instance = {
+   value: string;
+   gs1: boolean;
+   options: ResolvedOptions;
+   result: BarcodeResult | null;
+   metrics: RenderMetrics | null;
+};
+
+/** 组件事件。 */
+export type Emits = {
+   click: [event: UniEvent];
+   change: [];
+   complete: [];
+   error: [message: string];
+   export: [tempFilePath: string];
+   save: [tempFilePath: string];
+};

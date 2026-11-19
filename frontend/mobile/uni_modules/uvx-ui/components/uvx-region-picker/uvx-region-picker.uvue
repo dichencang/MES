@@ -1,0 +1,506 @@
+<template>
+   <view
+      class="uvx-region-picker"
+      :class="uClass"
+      :style="$uvx.style.parse(uStyle)"
+   >
+      <uvx-popup
+         ref="uPopup"
+         mode="bottom"
+         :round="round"
+         :close-on-click-overlay="closeOnClickOverlay"
+         @change="handlePopupChange"
+      >
+         <view class="uvx-region-picker__panel">
+            <!-- 标题栏 -->
+            <view class="uvx-region-picker__header">
+               <text class="uvx-region-picker__title uvx-line-1">{{ displayTitle }}</text>
+               <view
+                  class="uvx-region-picker__close"
+                  hover-class="uvx-region-picker__close--hover"
+                  @click.stop="handleCancel"
+               >
+                  <uvx-icon name="close" size="17" :bold="true"></uvx-icon>
+               </view>
+            </view>
+
+            <!-- 已选路径 -->
+            <scroll-view
+               class="uvx-region-picker__path-scroll"
+               direction="horizontal"
+               :show-scrollbar="false"
+            >
+               <view class="uvx-region-picker__path">
+                  <view
+                     v-for="(item, index) in selectedOptions"
+                     :key="index"
+                     class="uvx-region-picker__path-item"
+                     :class="activeLevel == index ? 'uvx-region-picker__path-item--active' : ''"
+                     @click="handlePathClick(index)"
+                  >
+                     <text
+                        class="uvx-region-picker__path-text"
+                        :class="activeLevel == index ? 'uvx-region-picker__path-text--active' : ''"
+                     >{{ item.label }}</text>
+                  </view>
+                  <view
+                     v-if="shouldShowPlaceholder"
+                     class="uvx-region-picker__path-item"
+                     :class="activeLevel == selectedOptions.length ? 'uvx-region-picker__path-item--active' : ''"
+                     @click="handlePathClick(selectedOptions.length)"
+                  >
+                     <text
+                        class="uvx-region-picker__path-text"
+                        :class="activeLevel == selectedOptions.length ? 'uvx-region-picker__path-text--active' : ''"
+                     >{{ displayPlaceholder }}</text>
+                  </view>
+               </view>
+            </scroll-view>
+
+            <!-- 当前层地区列表 -->
+            <scroll-view
+               v-if="currentOptions.length > 0"
+               class="uvx-region-picker__list"
+               direction="vertical"
+               :show-scrollbar="false"
+            >
+               <view
+                  v-for="(item, index) in currentOptions"
+                  :key="index"
+                  class="uvx-region-picker__option"
+                  :class="getOptionClass(item)"
+                  :hover-class="item.disabled == true ? 'none' : 'uvx-region-picker__option--hover'"
+                  @click="handleOptionClick(item)"
+               >
+                  <text
+                     class="uvx-region-picker__option-text"
+                     :class="getOptionTextClass(item)"
+                  >{{ item.label }}</text>
+                  <uvx-icon
+                     v-if="isSelected(item)"
+                     name="checkbox-mark"
+                     color="var(--uvx-primary)"
+                     size="16"
+                  ></uvx-icon>
+               </view>
+            </scroll-view>
+
+            <!-- 空数据 -->
+            <view v-else class="uvx-region-picker__empty">
+               <uvx-empty mode="data" :icon-size="72"></uvx-empty>
+            </view>
+         </view>
+      </uvx-popup>
+   </view>
+</template>
+
+<script lang="uts" setup>
+/**
+ * uvx-region-picker 地区选择
+ * @description 通过路径标签和逐级列表选择树形行政区域，选中叶子后自动提交。
+ * @tutorial https://www.uvxui.cn/components/region-picker.html
+ * @property {Array<RegionValue>} modelValue 当前已提交的地区值路径
+ * @property {Array<RegionNode>} options 树形地区数据
+ * @property {String} title 弹层标题
+ * @property {String} placeholder 未选择层级的占位文字
+ * @property {Boolean} closeOnClickOverlay 点击遮罩是否关闭，默认 true
+ * @property {String | Number} round 弹层顶部圆角，默认 10
+ * @property {String} uStyle 根节点自定义样式
+ * @property {String} uClass 根节点自定义类名
+ * @method open 打开地区选择器
+ * @method close 关闭地区选择器
+ * @event {Function} confirm 选中叶子节点时触发
+ * @event {Function} cancel 点击关闭按钮时触发
+ * @event {Function} close 弹层关闭时触发
+ */
+
+import { $uvx } from "../../index.uts";
+import { t } from "../../core/i18n";
+import type { ChangeEvent as PopupChangeEvent } from "../uvx-popup/types/index.uts";
+import type {
+   ConfirmEvent,
+   Emits,
+   Props,
+   RegionNode,
+   RegionValue,
+} from "./types/index.uts";
+
+defineOptions({
+   name: "uvx-region-picker",
+   options: { virtualHost: true },
+   externalClasses: ["u-class"],
+});
+
+const props = withDefaults(defineProps<Props>(), {
+   modelValue: (): RegionValue[] => [],
+   options: (): RegionNode[] => [],
+   title: "",
+   placeholder: "",
+   closeOnClickOverlay: true,
+   round: 10,
+   uStyle: "",
+   uClass: "",
+});
+const emit = defineEmits<Emits>();
+
+// 弹层实例
+const uPopup = ref<UvxPopupComponentPublicInstance | null>(null);
+// 当前草稿节点路径
+const selectedOptions = ref<RegionNode[]>([]);
+// 当前展示的地区层级
+const activeLevel = ref(0);
+
+/**
+ * 弹层标题
+ * @returns string
+ */
+const displayTitle = computed((): string => {
+   return props.title.length > 0 ? props.title : t("选择地区");
+});
+
+/**
+ * 路径占位文字
+ * @returns string
+ */
+const displayPlaceholder = computed((): string => {
+   return props.placeholder.length > 0 ? props.placeholder : t("请选择");
+});
+
+/**
+ * 当前路径是否已经到达叶子
+ * @returns boolean
+ */
+const isLeafPath = computed((): boolean => {
+   if (selectedOptions.value.length == 0) return false;
+   const LAST_NODE = selectedOptions.value[selectedOptions.value.length - 1];
+   return LAST_NODE.children == null || LAST_NODE.children!.length == 0;
+});
+
+/**
+ * 是否显示待选择路径
+ * @returns boolean
+ */
+const shouldShowPlaceholder = computed((): boolean => !isLeafPath.value);
+
+/**
+ * 当前层可选地区
+ * @returns RegionNode[]
+ */
+const currentOptions = computed((): RegionNode[] => {
+   if (activeLevel.value == 0) return props.options;
+   const PARENT_INDEX = activeLevel.value - 1;
+   if (PARENT_INDEX >= selectedOptions.value.length) return [];
+   const PARENT = selectedOptions.value[PARENT_INDEX];
+   return PARENT.children == null ? [] : PARENT.children!;
+});
+
+/**
+ * 查找同级节点
+ * @param options 同级节点
+ * @param value 节点值
+ * @returns RegionNode | null
+ */
+const getNodeByValue = (options: RegionNode[], value: RegionValue): RegionNode | null => {
+   for (let i = 0; i < options.length; i++) {
+      if (options[i].value == value && typeof options[i].value == typeof value) return options[i];
+   }
+   return null;
+};
+
+/**
+ * 根据外部值恢复最长有效路径
+ * @returns null
+ */
+const syncPath = (): void => {
+   const PATH: RegionNode[] = [];
+   let options = props.options;
+   for (let i = 0; i < props.modelValue.length; i++) {
+      const NODE = getNodeByValue(options, props.modelValue[i]);
+      if (NODE == null) break;
+      PATH.push(NODE);
+      options = NODE.children == null ? [] : NODE.children!;
+   }
+   selectedOptions.value = PATH;
+   if (PATH.length == 0) {
+      activeLevel.value = 0;
+      return;
+   }
+   const LAST_NODE = PATH[PATH.length - 1];
+   const IS_LEAF = LAST_NODE.children == null || LAST_NODE.children!.length == 0;
+   activeLevel.value = IS_LEAF ? PATH.length - 1 : PATH.length;
+};
+
+/**
+ * 判断节点是否为当前层选中项
+ * @param item 地区节点
+ * @returns boolean
+ */
+const isSelected = (item: RegionNode): boolean => {
+   if (activeLevel.value >= selectedOptions.value.length) return false;
+   const SELECTED = selectedOptions.value[activeLevel.value];
+   return SELECTED.value == item.value && typeof SELECTED.value == typeof item.value;
+};
+
+/**
+ * 获取地区项容器类名
+ * @param item 地区节点
+ * @returns string
+ */
+const getOptionClass = (item: RegionNode): string => {
+   if (item.disabled == true) return "uvx-region-picker__option--disabled";
+   return isSelected(item) ? "uvx-region-picker__option--selected" : "";
+};
+
+/**
+ * 获取地区项文字类名
+ * @param item 地区节点
+ * @returns string
+ */
+const getOptionTextClass = (item: RegionNode): string => {
+   if (item.disabled == true) return "uvx-region-picker__option-text--disabled";
+   return isSelected(item) ? "uvx-region-picker__option-text--selected" : "";
+};
+
+/**
+ * 点击路径层级
+ * @param index 层级索引
+ * @returns null
+ */
+const handlePathClick = (index: number): void => {
+   if (index < 0 || index > selectedOptions.value.length) return;
+   activeLevel.value = index;
+};
+
+/**
+ * 提交叶子节点路径
+ * @returns null
+ */
+const confirmPath = (): void => {
+   const VALUE = selectedOptions.value.map((item: RegionNode): RegionValue => item.value);
+   const EVENT: ConfirmEvent = {
+      value: VALUE,
+      selectedOptions: selectedOptions.value.slice(),
+   };
+   emit("update:modelValue", VALUE);
+   emit("confirm", EVENT);
+   uPopup.value?.close();
+};
+
+/**
+ * 点击地区节点
+ * @param item 地区节点
+ * @returns null
+ */
+const handleOptionClick = (item: RegionNode): void => {
+   if (item.disabled == true) return;
+   const PATH = selectedOptions.value.slice(0, activeLevel.value);
+   PATH.push(item);
+   selectedOptions.value = PATH;
+   if (item.children != null && item.children!.length > 0) {
+      activeLevel.value += 1;
+      return;
+   }
+   confirmPath();
+};
+
+/**
+ * 点击关闭按钮
+ * @returns null
+ */
+const handleCancel = (): void => {
+   emit("cancel");
+   uPopup.value?.close();
+};
+
+/**
+ * 处理弹层状态变化
+ * @param event 弹层状态
+ * @returns null
+ */
+const handlePopupChange = (event: PopupChangeEvent): void => {
+   if (!event.show) emit("close");
+};
+
+/**
+ * 打开地区选择器
+ * @returns null
+ */
+const open = (): void => {
+   syncPath();
+   uPopup.value?.open();
+};
+
+/**
+ * 关闭地区选择器
+ * @returns null
+ */
+const close = (): void => {
+   uPopup.value?.close();
+};
+
+watch((): RegionValue[] => props.modelValue, (): void => {
+   syncPath();
+});
+
+watch((): RegionNode[] => props.options, (): void => {
+   syncPath();
+});
+
+defineExpose({ open, close });
+</script>
+
+<style lang="scss">
+@import "../../core/scss/common.scss";
+
+// 地区选择根节点
+.uvx-region-picker {
+   position: relative;
+
+   // 弹层主体
+   &__panel {
+      display: flex;
+      flex-direction: column;
+      height: 500px;
+      background-color: var(--uvx-container);
+   }
+
+   // 标题栏
+   &__header {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      justify-content: center;
+      height: 52px;
+      padding: 0 52px;
+      position: relative;
+      border-bottom-width: 0.5px;
+      border-bottom-style: solid;
+      border-bottom-color: var(--uvx-border);
+   }
+
+   // 标题文字
+   &__title {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--uvx-text-main);
+      text-align: center;
+   }
+
+   // 关闭按钮
+   &__close {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      justify-content: center;
+      width: 52px;
+      height: 52px;
+      position: absolute;
+      top: 0;
+      right: 0;
+
+      &--hover {
+         opacity: 0.6;
+      }
+   }
+
+   // 路径横向滚动区
+   &__path-scroll {
+      height: 50px;
+      flex-shrink: 0;
+      border-bottom-width: 0.5px;
+      border-bottom-style: solid;
+      border-bottom-color: var(--uvx-border);
+   }
+
+   // 路径容器
+   &__path {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      height: 50px;
+      padding: 0 16px;
+   }
+
+   // 路径项
+   &__path-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 50px;
+      margin-right: 24px;
+      border-bottom-width: 2px;
+      border-bottom-style: solid;
+      border-bottom-color: transparent;
+
+      &--active {
+         border-bottom-color: var(--uvx-primary);
+      }
+   }
+
+   // 路径文字
+   &__path-text {
+      font-size: 14px;
+      color: var(--uvx-text-content);
+      white-space: nowrap;
+
+      &--active {
+         color: var(--uvx-primary);
+         font-weight: 500;
+      }
+   }
+
+   // 地区列表
+   &__list {
+      flex: 1;
+   }
+
+   // 地区项
+   &__option {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 48px;
+      padding: 0 18px;
+
+      &--hover {
+         background-color: var(--uvx-hover);
+      }
+
+      &--selected {
+         background-color: var(--uvx-primary-light);
+      }
+
+      &--disabled {
+         opacity: 0.5;
+      }
+   }
+
+   // 地区项文字
+   &__option-text {
+      flex: 1;
+      font-size: 15px;
+      color: var(--uvx-text-main);
+
+      &--selected {
+         color: var(--uvx-primary);
+         font-weight: 500;
+      }
+
+      &--disabled {
+         color: var(--uvx-disabled);
+      }
+   }
+
+   // 空数据容器
+   &__empty {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+   }
+
+}
+</style>

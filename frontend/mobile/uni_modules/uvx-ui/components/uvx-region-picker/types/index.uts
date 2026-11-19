@@ -1,0 +1,31 @@
+export type RegionValue = string | number;
+
+export type RegionNode = {
+   value: RegionValue;
+   label: string;
+   children?: RegionNode[];
+   disabled?: boolean;
+};
+
+export type ConfirmEvent = {
+   value: RegionValue[];
+   selectedOptions: RegionNode[];
+};
+
+export type Props = {
+   modelValue: RegionValue[];
+   options: RegionNode[];
+   title: string;
+   placeholder: string;
+   closeOnClickOverlay: boolean;
+   round: string | number;
+   uStyle: string;
+   uClass: string;
+};
+
+export type Emits = {
+   "update:modelValue": [value: RegionValue[]];
+   confirm: [event: ConfirmEvent];
+   cancel: [];
+   close: [];
+};

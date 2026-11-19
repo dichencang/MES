@@ -1,0 +1,1093 @@
+<template>
+   <view
+      class="uvx-signature"
+      :class="[uClass, { 'uvx-signature--disabled': disabled }]"
+      :style="rootStyle"
+   >
+      <!-- 签名画布 -->
+      <!-- #ifdef WEB -->
+      <view :id="surfaceId" ref="surfaceRef" class="uvx-signature__surface">
+         <canvas
+            :id="canvasId"
+            class="uvx-signature__canvas"
+            :style="canvasStyle"
+            @touchstart.stop.prevent="handleTouchStart"
+            @touchmove.stop.prevent="handleTouchMove"
+            @touchend.stop.prevent="handleTouchEnd"
+            @touchcancel.stop.prevent="handleTouchCancel"
+         ></canvas>
+      </view>
+      <!-- #endif -->
+      <!-- #ifdef MP-WEIXIN -->
+      <view :id="surfaceId" ref="surfaceRef" class="uvx-signature__surface">
+         <canvas
+            :id="canvasId"
+            class="uvx-signature__canvas"
+            :style="canvasStyle"
+            @touchstart.stop.prevent="handleTouchStart"
+            @touchmove.stop.prevent="handleTouchMove"
+            @touchend.stop.prevent="handleTouchEnd"
+            @touchcancel.stop.prevent="handleTouchCancel"
+         ></canvas>
+      </view>
+      <!-- #endif -->
+      <!-- #if APP-ANDROID || APP-IOS || APP-HARMONY -->
+      <view :id="surfaceId" ref="surfaceRef" class="uvx-signature__surface">
+         <canvas
+            :id="canvasId"
+            class="uvx-signature__canvas"
+            :style="canvasStyle"
+            @touchstart.stop.prevent="handleTouchStart"
+            @touchmove.stop.prevent="handleTouchMove"
+            @touchend.stop.prevent="handleTouchEnd"
+            @touchcancel.stop.prevent="handleTouchCancel"
+         ></canvas>
+      </view>
+      <!-- #endif -->
+
+      <!-- 编辑工具栏 -->
+       <view v-if="showToolbar" class="uvx-signature__toolbar">
+         <view class="uvx-signature__actions">
+            <view
+               class="uvx-signature__action"
+               :class="{ 'uvx-signature__action--disabled': !canUndo || disabled }"
+               @click="undo"
+            >
+               <uvx-icon name="backspace" :size="18"></uvx-icon>
+               <text class="uvx-signature__action-text">{{ t("撤销") }}</text>
+            </view>
+            <view
+               class="uvx-signature__action"
+               :class="{ 'uvx-signature__action--disabled': !canRedo || disabled }"
+               @click="redo"
+            >
+               <uvx-icon name="reload" :size="18"></uvx-icon>
+               <text class="uvx-signature__action-text">{{ t("重做") }}</text>
+            </view>
+            <view
+               class="uvx-signature__action"
+               :class="{ 'uvx-signature__action--active': currentTool == 'pen' }"
+               @click="setTool('pen')"
+            >
+               <uvx-icon name="edit-pen" :size="18"></uvx-icon>
+               <text class="uvx-signature__action-text">{{ t("画笔") }}</text>
+            </view>
+            <view
+               class="uvx-signature__action"
+               :class="{ 'uvx-signature__action--active': currentTool == 'eraser' }"
+               @click="setTool('eraser')"
+            >
+               <uvx-icon name="trash" :size="18"></uvx-icon>
+               <text class="uvx-signature__action-text">{{ t("橡皮") }}</text>
+            </view>
+            <view
+               class="uvx-signature__action"
+               :class="{ 'uvx-signature__action--disabled': (!canUndo && !canRedo) || disabled }"
+               @click="clear"
+            >
+               <uvx-icon name="close-circle" :size="18"></uvx-icon>
+               <text class="uvx-signature__action-text">{{ t("清空") }}</text>
+            </view>
+         </view>
+
+         <!-- 预设笔色 -->
+         <view class="uvx-signature__options">
+            <text class="uvx-signature__option-label">{{ t("颜色") }}</text>
+            <view class="uvx-signature__option-list">
+               <view
+                  v-for="(color, index) in colorOptions"
+                  :key="index"
+                  class="uvx-signature__color"
+                  :class="{ 'uvx-signature__color--active': currentColor == color && currentTool == 'pen' }"
+                  :style="getColorStyle(color)"
+                  @click="setColor(color)"
+               ></view>
+            </view>
+         </view>
+
+         <!-- 预设笔宽 -->
+         <view class="uvx-signature__options">
+            <text class="uvx-signature__option-label">{{ t("粗细") }}</text>
+            <view class="uvx-signature__option-list">
+               <view
+                  v-for="(width, index) in widthOptions"
+                  :key="index"
+                  class="uvx-signature__width"
+                  :class="{ 'uvx-signature__width--active': currentWidth == width && currentTool == 'pen' }"
+                  @click="setWidth(width)"
+               >
+                  <view class="uvx-signature__width-dot" :style="getWidthStyle(width)"></view>
+               </view>
+            </view>
+         </view>
+      </view>
+   </view>
+</template>
+
+<script lang="uts" setup>
+/**
+ * uvx-signature 签名板
+ * @description 提供跨端手写签名、编辑工具和 PNG 临时文件导出能力。
+ * @tutorial https://www.uvxui.cn/components/signature.html
+ * @property {String | Number} width 签名板宽度，默认 100%
+ * @property {String | Number} height 签名区域高度，默认 240
+ * @property {String} backgroundColor 不透明背景色，默认 #ffffff
+ * @property {String} penColor 初始画笔颜色，默认 #303133
+ * @property {Number} penWidth 初始画笔宽度，默认 4
+ * @property {Number} eraserWidth 橡皮宽度，默认 18
+ * @property {String[]} penColors 工具栏预设颜色
+ * @property {Number[]} penWidths 工具栏预设宽度
+ * @property {Boolean} showToolbar 是否显示内置工具栏，默认 true
+ * @property {Boolean} disabled 是否禁用绘制和工具栏，默认 false
+ * @property {String} uStyle 根节点自定义样式
+ * @property {String} uClass 根节点自定义类名
+ * @event {Function} ready 画布初始化完成时触发
+ * @event {Function} change 签名内容变化时触发
+ * @event {Function} export PNG 临时文件导出完成时触发
+ * @event {Function} error 初始化或导出失败时触发，返回错误信息
+ * @method init() 重新测量画布并重绘签名
+ * @method undo() 撤销最后一笔
+ * @method redo() 恢复最后一次撤销
+ * @method clear() 清空签名，清空操作不可撤销
+ * @method isEmpty() 判断是否存在画笔笔画，不执行像素级判空
+ * @method toTempFilePath() 导出 PNG 临时文件
+ * @example <uvx-signature ref="signature" @export="handleExport"></uvx-signature>
+ */
+import { $uvx } from "../../index.uts";
+import { t } from "../../core/i18n";
+import type {
+   Emits,
+   Props,
+   SignatureChangeAction,
+   SignatureChangeEvent,
+   SignaturePoint,
+   SignatureStroke,
+   SignatureTool,
+} from "./types/index.uts";
+
+defineOptions({
+   name: "uvx-signature",
+   options: { virtualHost: true },
+   externalClasses: ["u-class"],
+});
+
+const DEFAULT_PEN_COLOR = "#303133";
+const DEFAULT_PEN_WIDTH = 4;
+const DEFAULT_ERASER_WIDTH = 18;
+const DEFAULT_COLORS: string[] = ["#303133", "#3c9cff", "#f56c6c"];
+const DEFAULT_WIDTHS: number[] = [2, 4, 6];
+const MIN_POINT_DISTANCE = 1;
+const TOUCH_MOUSE_DELAY = 500;
+
+const props = withDefaults(defineProps<Props>(), {
+   width: "100%",
+   height: 240,
+   backgroundColor: "#ffffff",
+   penColor: DEFAULT_PEN_COLOR,
+   penWidth: DEFAULT_PEN_WIDTH,
+   eraserWidth: DEFAULT_ERASER_WIDTH,
+   penColors: (): string[] => [],
+   penWidths: (): number[] => [],
+   showToolbar: true,
+   disabled: false,
+   uStyle: "",
+   uClass: "",
+});
+
+const emit = defineEmits<Emits>();
+const instance = getCurrentInstance();
+const canvasId = "uvx-signature-" + Date.now().toString() + "-" + Math.floor(Math.random() * 100000).toString();
+const surfaceId = `${canvasId}-surface`;
+
+// 快照容器节点
+const surfaceRef = ref<UniElement | null>(null);
+// 当前工具
+const currentTool = ref<SignatureTool>("pen");
+// 当前画笔颜色
+const currentColor = ref(props.penColor == "" ? DEFAULT_PEN_COLOR : props.penColor);
+// 当前画笔宽度
+const currentWidth = ref(props.penWidth > 0 ? props.penWidth : DEFAULT_PEN_WIDTH);
+// 是否可以撤销
+const canUndo = ref(false);
+// 是否可以重做
+const canRedo = ref(false);
+// 画布是否已初始化
+const isReady = ref(false);
+// 是否正在导出
+const isExporting = ref(false);
+
+let canvasContext: CanvasContext | null = null;
+let context: CanvasRenderingContext2D | null = null;
+let canvasRect: DOMRect | null = null;
+let canvasWidth = 0;
+let canvasHeight = 0;
+let strokes: SignatureStroke[] = [];
+let redoStrokes: SignatureStroke[] = [];
+let activeStroke: SignatureStroke | null = null;
+let inputSource = "none";
+let inputToken = 0;
+let activeTouchId = -1;
+let lastTouchTime = 0;
+let initTimer = 0;
+let initToken = 0;
+let isUnmounted = false;
+// #ifdef WEB
+let mouseDownCallback: UniCallbackWrapper | null = null;
+let mouseMoveCallback: UniCallbackWrapper | null = null;
+let mouseUpCallback: UniCallbackWrapper | null = null;
+// #endif
+
+/**
+ * 根节点样式
+ * @returns UTSJSONObject
+ */
+const rootStyle = computed((): UTSJSONObject => {
+   const style: UTSJSONObject = { width: $uvx.format.unit(props.width) };
+   return $uvx.object.deepMerge(style, $uvx.style.parse(props.uStyle));
+});
+
+/**
+ * 画布布局样式
+ * @returns UTSJSONObject
+ */
+const canvasStyle = computed((): UTSJSONObject => {
+   return {
+      width: "100%",
+      height: $uvx.format.unit(props.height),
+      "background-color": getBackgroundColor(),
+   };
+});
+
+/**
+ * 有效预设颜色
+ * @returns string[]
+ */
+const colorOptions = computed((): string[] => {
+   return props.penColors.length > 0 ? props.penColors : DEFAULT_COLORS;
+});
+
+/**
+ * 有效预设宽度
+ * @returns number[]
+ */
+const widthOptions = computed((): number[] => {
+   const values: number[] = [];
+   for (let index = 0; index < props.penWidths.length; index++) {
+      if (props.penWidths[index] > 0) values.push(props.penWidths[index]);
+   }
+   return values.length > 0 ? values : DEFAULT_WIDTHS;
+});
+
+/**
+ * 获取有效背景色
+ * @returns string
+ */
+const getBackgroundColor = (): string => {
+   return props.backgroundColor == "" ? "#ffffff" : props.backgroundColor;
+};
+
+/**
+ * 获取有效橡皮宽度
+ * @returns number
+ */
+const getEraserWidth = (): number => {
+   return props.eraserWidth > 0 ? props.eraserWidth : DEFAULT_ERASER_WIDTH;
+};
+
+/**
+ * 获取颜色选项样式
+ * @param color 颜色值
+ * @returns UTSJSONObject
+ */
+const getColorStyle = (color: string): UTSJSONObject => {
+   return { "background-color": color };
+};
+
+/**
+ * 获取宽度选项样式
+ * @param width 画笔宽度
+ * @returns UTSJSONObject
+ */
+const getWidthStyle = (width: number): UTSJSONObject => {
+   const size = `${Math.max(4, Math.min(14, width * 2))}px`;
+   return { width: size, height: size };
+};
+
+/**
+ * 签名是否为空
+ * @returns boolean
+ */
+const isEmpty = (): boolean => {
+   for (let index = 0; index < strokes.length; index++) {
+      if (strokes[index].tool == "pen") return false;
+   }
+   return true;
+};
+
+/**
+ * 同步历史操作状态
+ * @returns null
+ */
+const syncHistoryState = (): void => {
+   canUndo.value = strokes.length > 0;
+   canRedo.value = redoStrokes.length > 0;
+};
+
+/**
+ * 发布签名变化
+ * @param action 变化类型
+ * @returns null
+ */
+const emitChange = (action: SignatureChangeAction): void => {
+   const event: SignatureChangeEvent = {
+      action,
+      empty: isEmpty(),
+      canUndo: canUndo.value,
+      canRedo: canRedo.value,
+      strokeCount: strokes.length,
+   };
+   emit("change", event);
+};
+
+/**
+ * 将归一化坐标转换为画布坐标
+ * @param point 签名点
+ * @returns SignaturePoint
+ */
+const getCanvasPoint = (point: SignaturePoint): SignaturePoint => {
+   return { x: point.x * canvasWidth, y: point.y * canvasHeight };
+};
+
+/**
+ * 绘制单条笔画
+ * @param stroke 签名笔画
+ * @returns null
+ */
+const drawStroke = (stroke: SignatureStroke): void => {
+   const currentContext = context;
+   if (currentContext == null || stroke.points.length == 0) return;
+   const color = stroke.tool == "eraser" ? getBackgroundColor() : stroke.color;
+   const firstPoint = getCanvasPoint(stroke.points[0]);
+   currentContext.strokeStyle = color;
+   currentContext.fillStyle = color;
+   currentContext.lineWidth = stroke.width;
+   currentContext.lineCap = "round";
+   currentContext.lineJoin = "round";
+   if (stroke.points.length == 1) {
+      currentContext.beginPath();
+      currentContext.arc(firstPoint.x, firstPoint.y, stroke.width / 2, 0, Math.PI * 2, false);
+      currentContext.fill();
+      return;
+   }
+   currentContext.beginPath();
+   currentContext.moveTo(firstPoint.x, firstPoint.y);
+   for (let index = 1; index < stroke.points.length; index++) {
+      const point = getCanvasPoint(stroke.points[index]);
+      currentContext.lineTo(point.x, point.y);
+   }
+   currentContext.stroke();
+};
+
+/**
+ * 重绘背景和全部历史笔画
+ * @returns null
+ */
+const redraw = (): void => {
+   const currentContext = context;
+   if (currentContext == null || canvasWidth <= 0 || canvasHeight <= 0) return;
+   currentContext.clearRect(0, 0, canvasWidth, canvasHeight);
+   currentContext.fillStyle = getBackgroundColor();
+   currentContext.fillRect(0, 0, canvasWidth, canvasHeight);
+   for (let index = 0; index < strokes.length; index++) drawStroke(strokes[index]);
+};
+
+/**
+ * 测量画布矩形
+ * @returns Promise<boolean>
+ */
+const measureCanvas = async (): Promise<boolean> => {
+   const currentContext = context;
+   const surface = surfaceRef.value;
+   if (currentContext == null || surface == null) return false;
+   const canvas = currentContext.canvas;
+   const promise = surface.getBoundingClientRectAsync();
+   if (promise == null) return false;
+   const rect = await promise;
+   const width = canvas.offsetWidth;
+   const height = canvas.offsetHeight;
+   if (rect.width <= 0 || rect.height <= 0 || width <= 0 || height <= 0) return false;
+   canvasRect = rect;
+   canvasWidth = width;
+   canvasHeight = height;
+   const windowInfo = uni.getWindowInfo();
+   const dpr = windowInfo.pixelRatio > 0 ? windowInfo.pixelRatio : 1;
+   canvas.width = Math.round(canvasWidth * dpr);
+   canvas.height = Math.round(canvasHeight * dpr);
+   currentContext.scale(dpr, dpr);
+   redraw();
+   return true;
+};
+
+/**
+ * 延迟重试画布初始化
+ * @param attempt 当前次数
+ * @returns null
+ */
+const scheduleInit = (attempt: number, token: number): void => {
+   if (initTimer != 0) clearTimeout(initTimer);
+   initTimer = setTimeout((): void => {
+      initTimer = 0;
+      if (isUnmounted || token != initToken) return;
+      measureCanvas().then((hasMeasured: boolean): void => {
+         if (isUnmounted || token != initToken) return;
+         if (!hasMeasured && attempt < 3) {
+            scheduleInit(attempt + 1, token);
+            return;
+         }
+         if (!hasMeasured) {
+            emit("error", "canvas size is invalid");
+            return;
+         }
+         isReady.value = true;
+         emit("ready");
+      });
+   }, attempt == 0 ? 0 : 120);
+};
+
+/**
+ * 初始化签名画布
+ * @returns null
+ */
+const init = (): void => {
+   initToken = initToken + 1;
+   const token = initToken;
+   inputToken = inputToken + 1;
+   if (initTimer != 0) clearTimeout(initTimer);
+   isReady.value = false;
+   activeStroke = null;
+   inputSource = "none";
+   activeTouchId = -1;
+   const component = instance == null ? null : instance.proxy;
+   if (component == null) {
+      emit("error", "component is unavailable");
+      return;
+   }
+   uni.createCanvasContextAsync({
+      id: canvasId,
+      component,
+      success: (value: CanvasContext): void => {
+         if (isUnmounted || token != initToken) return;
+         const valueContext = value.getContext("2d");
+         if (valueContext == null) {
+            emit("error", "canvas context is unavailable");
+            return;
+         }
+         canvasContext = value;
+         context = valueContext;
+         scheduleInit(0, token);
+      },
+      fail: (error: UniError): void => {
+         if (token != initToken) return;
+         emit("error", error.errMsg);
+      },
+   });
+};
+
+/**
+ * 刷新画布相对窗口的位置
+ * @returns Promise<boolean>
+ */
+const refreshCanvasRect = async (): Promise<boolean> => {
+   const surface = surfaceRef.value;
+   if (surface == null) return false;
+   const promise = surface.getBoundingClientRectAsync();
+   if (promise == null) return false;
+   const rect = await promise;
+   if (rect.width <= 0 || rect.height <= 0) return false;
+   canvasRect = rect;
+   return true;
+};
+
+/**
+ * 将页面坐标转换为签名点
+ * @param clientX 页面横坐标
+ * @param clientY 页面纵坐标
+ * @returns SignaturePoint | null
+ */
+const normalizePoint = (clientX: number, clientY: number): SignaturePoint | null => {
+   const rect = canvasRect;
+   if (rect == null || canvasWidth <= 0 || canvasHeight <= 0) return null;
+   const x = Math.max(0, Math.min(canvasWidth, clientX - rect.left));
+   const y = Math.max(0, Math.min(canvasHeight, clientY - rect.top));
+   return { x: x / canvasWidth, y: y / canvasHeight };
+};
+
+/**
+ * 开始一条笔画
+ * @param clientX 页面横坐标
+ * @param clientY 页面纵坐标
+ * @param source 输入来源
+ * @returns null
+ */
+const beginStroke = (clientX: number, clientY: number, source: string): void => {
+   if (props.disabled || !isReady.value || inputSource != "none") return;
+   const point = normalizePoint(clientX, clientY);
+   if (point == null) return;
+   inputSource = source;
+   activeStroke = {
+      tool: currentTool.value,
+      color: currentColor.value,
+      width: currentTool.value == "eraser" ? getEraserWidth() : currentWidth.value,
+      points: [point],
+   };
+   drawStroke(activeStroke!);
+};
+
+/**
+ * 向当前笔画追加点
+ * @param clientX 页面横坐标
+ * @param clientY 页面纵坐标
+ * @param source 输入来源
+ * @returns null
+ */
+const appendStroke = (clientX: number, clientY: number, source: string): void => {
+   const stroke = activeStroke;
+   if (stroke == null || inputSource != source) return;
+   const point = normalizePoint(clientX, clientY);
+   if (point == null) return;
+   const lastPoint = stroke.points[stroke.points.length - 1];
+   const distanceX = (point.x - lastPoint.x) * canvasWidth;
+   const distanceY = (point.y - lastPoint.y) * canvasHeight;
+   if (Math.sqrt(distanceX * distanceX + distanceY * distanceY) < MIN_POINT_DISTANCE) return;
+   stroke.points.push(point);
+   const currentContext = context;
+   if (currentContext == null) return;
+   const from = getCanvasPoint(lastPoint);
+   const to = getCanvasPoint(point);
+   currentContext.strokeStyle = stroke.tool == "eraser" ? getBackgroundColor() : stroke.color;
+   currentContext.lineWidth = stroke.width;
+   currentContext.lineCap = "round";
+   currentContext.lineJoin = "round";
+   currentContext.beginPath();
+   currentContext.moveTo(from.x, from.y);
+   currentContext.lineTo(to.x, to.y);
+   currentContext.stroke();
+};
+
+/**
+ * 结束当前笔画
+ * @param source 输入来源
+ * @returns null
+ */
+const finishStroke = (source: string): void => {
+   const stroke = activeStroke;
+   if (stroke == null || inputSource != source) return;
+   strokes.push(stroke);
+   redoStrokes = [];
+   activeStroke = null;
+   inputSource = "none";
+   activeTouchId = -1;
+   syncHistoryState();
+   emitChange("stroke");
+};
+
+/**
+ * 读取指定触点
+ * @param event 触摸事件
+ * @param touchId 触点标识
+ * @returns UniTouch | null
+ */
+const getTouch = (event: UniTouchEvent, touchId: number): UniTouch | null => {
+   for (let index = 0; index < event.changedTouches.length; index++) {
+      const touch = event.changedTouches[index];
+      if (touchId < 0 || touch.identifier == touchId) return touch;
+   }
+   for (let index = 0; index < event.touches.length; index++) {
+      const touch = event.touches[index];
+      if (touchId < 0 || touch.identifier == touchId) return touch;
+   }
+   return null;
+};
+
+/**
+ * 处理触摸开始
+ * @param event 触摸事件
+ * @returns null
+ */
+const handleTouchStart = async (event: UniTouchEvent): Promise<void> => {
+   if (props.disabled || !isReady.value || inputSource != "none" || activeTouchId >= 0) return;
+   const touch = getTouch(event, -1);
+   if (touch == null) return;
+   lastTouchTime = Date.now();
+   activeTouchId = touch.identifier;
+   inputToken = inputToken + 1;
+   const token = inputToken;
+   const hasMeasured = await refreshCanvasRect();
+   if (!hasMeasured || token != inputToken || activeTouchId != touch.identifier || inputSource != "none") {
+      if (activeTouchId == touch.identifier) activeTouchId = -1;
+      return;
+   }
+   beginStroke(touch.clientX, touch.clientY, "touch");
+};
+
+/**
+ * 处理触摸移动
+ * @param event 触摸事件
+ * @returns null
+ */
+const handleTouchMove = (event: UniTouchEvent): void => {
+   const touch = getTouch(event, activeTouchId);
+   if (touch == null) return;
+   lastTouchTime = Date.now();
+   appendStroke(touch.clientX, touch.clientY, "touch");
+};
+
+/**
+ * 处理触摸结束
+ * @param event 触摸事件
+ * @returns null
+ */
+const handleTouchEnd = (event: UniTouchEvent): void => {
+   let touch: UniTouch | null = null;
+   for (let index = 0; index < event.changedTouches.length; index++) {
+      if (event.changedTouches[index].identifier == activeTouchId) {
+         touch = event.changedTouches[index];
+         break;
+      }
+   }
+   if (touch == null) return;
+   inputToken = inputToken + 1;
+   appendStroke(touch.clientX, touch.clientY, "touch");
+   lastTouchTime = Date.now();
+   if (activeStroke == null) {
+      activeTouchId = -1;
+      return;
+   }
+   finishStroke("touch");
+};
+
+/**
+ * 处理触摸取消
+ * @returns null
+ */
+const handleTouchCancel = (): void => {
+   inputToken = inputToken + 1;
+   lastTouchTime = Date.now();
+   if (activeStroke == null) {
+      activeTouchId = -1;
+      return;
+   }
+   finishStroke("touch");
+};
+
+// #ifdef WEB
+/**
+ * 处理鼠标按下
+ * @param event 鼠标事件
+ * @returns null
+ */
+const handleMouseDown = async (event: UniMouseEvent): Promise<void> => {
+   if (props.disabled || !isReady.value || activeTouchId >= 0) return;
+   if (Date.now() - lastTouchTime < TOUCH_MOUSE_DELAY) return;
+   inputToken = inputToken + 1;
+   const token = inputToken;
+   const hasMeasured = await refreshCanvasRect();
+   if (!hasMeasured || token != inputToken || inputSource != "none") return;
+   beginStroke(event.clientX, event.clientY, "mouse");
+};
+
+/**
+ * 处理鼠标移动
+ * @param event 鼠标事件
+ * @returns null
+ */
+const handleMouseMove = (event: UniMouseEvent): void => {
+   appendStroke(event.clientX, event.clientY, "mouse");
+};
+
+/**
+ * 处理鼠标松开
+ * @returns null
+ */
+const handleMouseUp = (): void => {
+   inputToken = inputToken + 1;
+   finishStroke("mouse");
+};
+
+/**
+ * 注册 Web 鼠标事件
+ * @returns null
+ */
+const registerMouseEvents = (): void => {
+   const surface = surfaceRef.value;
+   if (surface == null) return;
+   mouseDownCallback = surface.addEventListener<UniMouseEvent, void>("mousedown", (event: UniMouseEvent): void => {
+      event.stopPropagation();
+      event.preventDefault();
+      handleMouseDown(event);
+   });
+   mouseMoveCallback = surface.addEventListener<UniMouseEvent, void>("mousemove", (event: UniMouseEvent): void => {
+      event.stopPropagation();
+      event.preventDefault();
+      handleMouseMove(event);
+   });
+   mouseUpCallback = surface.addEventListener<UniMouseEvent, void>("mouseup", (event: UniMouseEvent): void => {
+      event.stopPropagation();
+      event.preventDefault();
+      handleMouseUp();
+   });
+};
+
+/**
+ * 移除 Web 鼠标事件
+ * @returns null
+ */
+const unregisterMouseEvents = (): void => {
+   const surface = surfaceRef.value;
+   if (surface == null) return;
+   if (mouseDownCallback != null) surface.removeEventListener("mousedown", mouseDownCallback!);
+   if (mouseMoveCallback != null) surface.removeEventListener("mousemove", mouseMoveCallback!);
+   if (mouseUpCallback != null) surface.removeEventListener("mouseup", mouseUpCallback!);
+   mouseDownCallback = null;
+   mouseMoveCallback = null;
+   mouseUpCallback = null;
+};
+
+// #endif
+
+/**
+ * 切换签名工具
+ * @param tool 签名工具
+ * @returns null
+ */
+const setTool = (tool: SignatureTool): void => {
+   if (props.disabled) return;
+   if (activeStroke != null) finishStroke(inputSource);
+   currentTool.value = tool;
+};
+
+/**
+ * 设置画笔颜色
+ * @param color 颜色值
+ * @returns null
+ */
+const setColor = (color: string): void => {
+   if (props.disabled || color == "") return;
+   if (activeStroke != null) finishStroke(inputSource);
+   currentColor.value = color;
+   currentTool.value = "pen";
+};
+
+/**
+ * 设置画笔宽度
+ * @param width 画笔宽度
+ * @returns null
+ */
+const setWidth = (width: number): void => {
+   if (props.disabled || width <= 0) return;
+   if (activeStroke != null) finishStroke(inputSource);
+   currentWidth.value = width;
+   currentTool.value = "pen";
+};
+
+/**
+ * 撤销最后一笔
+ * @returns null
+ */
+const undo = (): void => {
+   if (props.disabled) return;
+   if (activeStroke != null) finishStroke(inputSource);
+   if (strokes.length == 0) return;
+   const stroke = strokes.pop();
+   if (stroke == null) return;
+   redoStrokes.push(stroke);
+   syncHistoryState();
+   redraw();
+   emitChange("undo");
+};
+
+/**
+ * 恢复最后一次撤销
+ * @returns null
+ */
+const redo = (): void => {
+   if (props.disabled) return;
+   if (activeStroke != null) finishStroke(inputSource);
+   if (redoStrokes.length == 0) return;
+   const stroke = redoStrokes.pop();
+   if (stroke == null) return;
+   strokes.push(stroke);
+   syncHistoryState();
+   redraw();
+   emitChange("redo");
+};
+
+/**
+ * 清空签名
+ * @returns null
+ */
+const clear = (): void => {
+   if (props.disabled) return;
+   if (activeStroke != null) finishStroke(inputSource);
+   if (strokes.length == 0 && redoStrokes.length == 0) return;
+   activeStroke = null;
+   inputSource = "none";
+   activeTouchId = -1;
+   strokes = [];
+   redoStrokes = [];
+   syncHistoryState();
+   redraw();
+   emitChange("clear");
+};
+
+/**
+ * 导出 PNG 临时文件
+ * @returns null
+ */
+const toTempFilePath = (): void => {
+   if (!isReady.value) {
+      emit("error", "signature is not ready");
+      return;
+   }
+   if (activeStroke != null) finishStroke(inputSource);
+   if (isEmpty()) {
+      emit("error", "signature is empty");
+      return;
+   }
+   if (isExporting.value) {
+      emit("error", "export is already in progress");
+      return;
+   }
+   isExporting.value = true;
+   // #if WEB || MP-WEIXIN
+   const component = instance == null ? null : instance.proxy;
+   if (component == null) {
+      isExporting.value = false;
+      emit("error", "component is unavailable");
+      return;
+   }
+   const currentContext = context;
+   if (currentContext == null) {
+      isExporting.value = false;
+      emit("error", "canvas context is unavailable");
+      return;
+   }
+   uni.canvasToTempFilePath({
+      canvasId,
+      canvas: currentContext.canvas,
+      fileType: "png",
+      success: (result): void => {
+         isExporting.value = false;
+         emit("export", result.tempFilePath);
+      },
+      fail: (error): void => {
+         isExporting.value = false;
+         emit("error", error.errMsg);
+      },
+   }, component);
+   return;
+   // #endif
+   // #if APP-ANDROID || APP-IOS || APP-HARMONY
+   const element = uni.getElementById(surfaceId);
+   if (element == null) {
+      isExporting.value = false;
+      emit("error", "snapshot element is unavailable");
+      return;
+   }
+   element!.takeSnapshot({
+      type: "file",
+      format: "png",
+      success: (result: TakeSnapshotSuccess): void => {
+         isExporting.value = false;
+         emit("export", result.tempFilePath);
+      },
+      fail: (error: TakeSnapshotFail): void => {
+         isExporting.value = false;
+         emit("error", error.errMsg);
+      },
+   });
+   // #endif
+};
+
+watch((): string => props.penColor, (value: string): void => {
+   currentColor.value = value == "" ? DEFAULT_PEN_COLOR : value;
+});
+
+watch((): number => props.penWidth, (value: number): void => {
+   currentWidth.value = value > 0 ? value : DEFAULT_PEN_WIDTH;
+});
+
+watch(
+   (): (string | number)[] => [props.width, props.height, props.backgroundColor],
+   (): void => {
+      nextTick((): void => init());
+   },
+);
+
+onMounted((): void => {
+   nextTick((): void => {
+      // #ifdef WEB
+      registerMouseEvents();
+      // #endif
+      init();
+   });
+});
+
+onUnmounted((): void => {
+   isUnmounted = true;
+   initToken = initToken + 1;
+   // #ifdef WEB
+   unregisterMouseEvents();
+   // #endif
+   if (initTimer != 0) clearTimeout(initTimer);
+   canvasContext = null;
+   context = null;
+});
+
+defineExpose({ init, undo, redo, clear, isEmpty, toTempFilePath });
+</script>
+
+<style lang="scss" scoped>
+@import "../../core/scss/common.scss";
+
+// 签名板根节点
+.uvx-signature {
+   display: flex;
+   flex-direction: column;
+   overflow: hidden;
+   border: 1px solid var(--uvx-border);
+   border-radius: 8px;
+   background-color: var(--uvx-container);
+}
+
+// 禁用状态
+.uvx-signature--disabled {
+   opacity: 0.6;
+}
+
+// 快照区域
+.uvx-signature__surface {
+   display: flex;
+   flex-direction: column;
+   width: 100%;
+   overflow: hidden;
+}
+
+// 签名画布
+.uvx-signature__canvas {
+   width: 100%;
+}
+
+// 编辑工具栏
+.uvx-signature__toolbar {
+   display: flex;
+   flex-direction: column;
+   padding: 10px;
+   border-top: 1px solid var(--uvx-border);
+   background-color: var(--uvx-container);
+}
+
+// 操作按钮区域
+.uvx-signature__actions {
+   display: flex;
+   flex-direction: row;
+   flex-wrap: wrap;
+   margin: -4px;
+}
+
+// 操作按钮
+.uvx-signature__action {
+   display: flex;
+   flex-direction: row;
+   align-items: center;
+   justify-content: center;
+   min-height: 34px;
+   margin: 4px;
+   padding: 0 10px;
+   border-radius: 6px;
+   background-color: var(--uvx-hover);
+}
+
+// 操作按钮选中态
+.uvx-signature__action--active {
+   color: var(--uvx-primary);
+   background-color: var(--uvx-hover);
+}
+
+// 操作按钮禁用态
+.uvx-signature__action--disabled {
+   opacity: 0.35;
+}
+
+// 操作按钮文字
+.uvx-signature__action-text {
+   margin-left: 4px;
+   color: var(--uvx-text-main);
+   font-size: 13px;
+   line-height: 18px;
+}
+
+// 工具选项区域
+.uvx-signature__options {
+   display: flex;
+   flex-direction: row;
+   align-items: center;
+   min-height: 36px;
+   margin-top: 8px;
+}
+
+// 工具选项标题
+.uvx-signature__option-label {
+   width: 44px;
+   color: var(--uvx-text-content);
+   font-size: 13px;
+}
+
+// 工具选项列表
+.uvx-signature__option-list {
+   display: flex;
+   flex: 1;
+   flex-direction: row;
+   flex-wrap: wrap;
+   align-items: center;
+}
+
+// 颜色选项
+.uvx-signature__color {
+   width: 24px;
+   height: 24px;
+   margin-right: 12px;
+   border: 2px solid transparent;
+   border-radius: 50%;
+}
+
+// 颜色选中态
+.uvx-signature__color--active {
+   border-color: var(--uvx-primary);
+}
+
+// 宽度选项
+.uvx-signature__width {
+   display: flex;
+   flex-direction: row;
+   align-items: center;
+   justify-content: center;
+   width: 34px;
+   height: 34px;
+   margin-right: 8px;
+   border: 1px solid transparent;
+   border-radius: 6px;
+}
+
+// 宽度选中态
+.uvx-signature__width--active {
+   border-color: var(--uvx-primary);
+   background-color: var(--uvx-hover);
+}
+
+// 宽度预览圆点
+.uvx-signature__width-dot {
+   border-radius: 50%;
+   background-color: var(--uvx-text-main);
+}
+</style>

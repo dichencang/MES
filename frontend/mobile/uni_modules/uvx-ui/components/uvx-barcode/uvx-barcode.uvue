@@ -1,0 +1,585 @@
+<template>
+   <view
+      :id="rootId"
+      class="uvx-barcode"
+      :class="[uClass, { 'uvx-barcode--hidden': hide }]"
+      :style="rootStyle"
+   >
+      <!-- 条形码画布 -->
+      <canvas
+         v-if="result != null"
+         :id="canvasId"
+         class="uvx-barcode__canvas"
+         :style="canvasStyle"
+         @click="handleClick"
+      ></canvas>
+
+      <!-- 加载效果 -->
+      <view v-if="loading || isMaking" class="uvx-barcode__loading">
+         <slot name="loading">
+            <uvx-loading-icon mode="circle" color="#3c9cff" :size="24"></uvx-loading-icon>
+         </slot>
+      </view>
+
+      <!-- Web 保存提示 -->
+      <!-- #ifdef WEB -->
+      <uvx-overlay
+         :show="isH5Save"
+         :z-index="100"
+         :opacity="0.68"
+         @click="handleCloseSaveTip"
+      >
+         <view class="uvx-barcode__save-content">
+            <view class="uvx-barcode__save-panel" @click.stop="()=>{}">
+               <slot name="h5save" :temp-file-path="tempFilePath">
+                  <image class="uvx-barcode__save-image" mode="widthFix" :src="tempFilePath"></image>
+                  <text class="uvx-barcode__save-text">{{ t("请长按条形码进行保存") }}</text>
+               </slot>
+            </view>
+         </view>
+      </uvx-overlay>
+      <!-- #endif -->
+   </view>
+</template>
+
+<script lang="uts" setup>
+/**
+ * uvx-barcode 条形码
+ * @description 生成 CODE128/GS1-128 条形码，并支持导出和保存 PNG。
+ * @tutorial https://www.uvxui.cn/components/barcode.html
+ * @property {String | Number} value 条形码内容，默认为空字符串
+ * @property {Boolean} gs1 是否在数据开头编码 FNC1，默认 false
+ * @property {Object} options 条形码绘制配置
+ * @property {String | Number} width 条形码宽度，默认 320
+ * @property {String | Number} height 条形码高度，默认 120
+ * @property {Boolean} start 组件挂载后是否立即生成，默认 true
+ * @property {Boolean} auto 数据、尺寸或配置变化时是否自动重新生成，默认 true
+ * @property {Boolean} hide 是否将条形码移出可视区域，默认 false
+ * @property {Boolean} loading 是否显示加载状态，默认 false
+ * @property {Boolean} h5SaveTip Web 端保存时是否显示长按提示，默认 true
+ * @property {String} uStyle 根节点自定义样式
+ * @property {String} uClass 根节点自定义类名
+ * @event {Function} click 点击条形码时触发
+ * @event {Function} change 调用 remake 重新生成时触发
+ * @event {Function} complete 条形码绘制完成时触发
+ * @event {Function} error 生成、导出或保存失败时触发
+ * @event {Function} export 导出完成时触发，返回临时文件路径
+ * @event {Function} save 保存完成时触发，返回文件路径
+ * @slot loading 自定义加载内容
+ * @slot h5save Web 端自定义保存提示，提供 tempFilePath
+ * @method make() 生成条形码
+ * @method remake() 触发 change 事件并重新生成条形码
+ * @method toTempFilePath() 导出条形码 PNG 临时文件
+ * @method save() 保存条形码到系统相册
+ * @method getInstance() 获取当前条形码实例快照
+ * @example <uvx-barcode value="UVX-2026-001"></uvx-barcode>
+ */
+import { $uvx } from "../../index.uts";
+import { t } from "../../core/i18n";
+import { encodeBarcode } from "./barcode.uts";
+import type { BarcodeResult, Emits, Instance, Props, RenderMetrics, ResolvedOptions } from "./types/index.uts";
+
+defineOptions({
+   name: "uvx-barcode",
+   options: { virtualHost: true },
+   externalClasses: ["u-class"],
+});
+
+const props = withDefaults(defineProps<Props>(), {
+   value: "",
+   gs1: false,
+   options: {},
+   width: 320,
+   height: 120,
+   start: true,
+   auto: true,
+   hide: false,
+   loading: false,
+   h5SaveTip: true,
+   uStyle: "",
+   uClass: "",
+});
+
+const emit = defineEmits<Emits>();
+const instance = getCurrentInstance();
+const canvasId = "uvx-barcode-" + Date.now().toString() + "-" + Math.floor(Math.random() * 100000).toString();
+const rootId = `${canvasId}-root`;
+
+// 当前编码结果
+const result = ref<BarcodeResult | null>(null);
+// 当前绘制指标
+const metrics = ref<RenderMetrics | null>(null);
+// 是否正在生成
+const isMaking = ref(false);
+// 是否正在导出
+const isExporting = ref(false);
+// 是否显示 Web 保存提示
+const isH5Save = ref(false);
+// 最近一次导出路径
+const tempFilePath = ref("");
+let context: CanvasRenderingContext2D | null = null;
+let drawToken = 0;
+
+/**
+ * 条形码布局宽度
+ * @returns string
+ */
+const width = computed((): string => {
+   return $uvx.format.unit(props.width);
+});
+
+/**
+ * 条形码布局高度
+ * @returns string
+ */
+const height = computed((): string => {
+   return $uvx.format.unit(props.height);
+});
+
+/**
+ * 根节点样式
+ * @returns UTSJSONObject
+ */
+const rootStyle = computed((): UTSJSONObject => {
+   const style: UTSJSONObject = {
+      width: width.value,
+      height: height.value,
+   };
+   return $uvx.object.deepMerge(style, $uvx.style.parse(props.uStyle));
+});
+
+/**
+ * Canvas 布局样式
+ * @returns UTSJSONObject
+ */
+const canvasStyle = computed((): UTSJSONObject => {
+   return { width: width.value, height: height.value };
+});
+
+/**
+ * 解析完整绘制配置
+ * @returns ResolvedOptions
+ */
+const getResolvedOptions = (): ResolvedOptions => {
+   const options = props.options;
+   return {
+      margin: options.margin == null ? 10 : Math.max(0, options.margin),
+      quietZone: options.quietZone == null ? 10 : Math.max(10, Math.floor(options.quietZone)),
+      showText: options.showText == null ? true : options.showText,
+      displayText: options.displayText == null ? "" : options.displayText,
+      fontSize: options.fontSize == null || options.fontSize <= 0 ? 16 : options.fontSize,
+      textMargin: options.textMargin == null ? 4 : Math.max(0, options.textMargin),
+      foregroundColor: options.foregroundColor == null || options.foregroundColor == "" ? "#000000" : options.foregroundColor,
+      backgroundColor: options.backgroundColor == null || options.backgroundColor == "" ? "#ffffff" : options.backgroundColor,
+      textColor: options.textColor == null || options.textColor == "" ? "#000000" : options.textColor,
+   };
+};
+
+/**
+ * 获取编码内容
+ * @returns string
+ */
+const getValue = (): string => {
+   return String(props.value);
+};
+
+/**
+ * 终止生成并触发错误
+ * @param message 错误信息
+ * @returns null
+ */
+const handleMakeError = (message: string): void => {
+   isMaking.value = false;
+   context = null;
+   metrics.value = null;
+   emit("error", message);
+};
+
+/**
+ * 将编码结果绘制到 Canvas
+ * @param token 当前绘制令牌
+ * @returns null
+ */
+const drawCanvas = (token: number): void => {
+   const currentResult = result.value;
+   if (currentResult == null) {
+      handleMakeError("barcode result is unavailable");
+      return;
+   }
+   const component = instance == null ? null : instance.proxy;
+   if (component == null) {
+      handleMakeError("component is unavailable");
+      return;
+   }
+   uni.createCanvasContextAsync({
+      id: canvasId,
+      component,
+      success: (canvasContext: CanvasContext): void => {
+         if (token != drawToken) return;
+         const currentContext = canvasContext.getContext("2d");
+         if (currentContext == null) {
+            handleMakeError("canvas context is unavailable");
+            return;
+         }
+         const canvas = currentContext.canvas;
+         const pixelRatioValue = uni.getWindowInfo().pixelRatio;
+         const pixelRatio = pixelRatioValue > 0 ? pixelRatioValue : 1;
+         const canvasWidth = Math.round(canvas.offsetWidth * pixelRatio);
+         const canvasHeight = Math.round(canvas.offsetHeight * pixelRatio);
+         if (canvasWidth <= 0 || canvasHeight <= 0) {
+            handleMakeError("canvas size is invalid");
+            return;
+         }
+         canvas.width = canvasWidth;
+         canvas.height = canvasHeight;
+         const options = getResolvedOptions();
+         const marginPixels = Math.round(options.margin * pixelRatio);
+         const totalModules = options.quietZone * 2 + currentResult.modules.length;
+         const availableWidth = canvasWidth - marginPixels * 2;
+         const moduleWidth = Math.floor(availableWidth / totalModules);
+         if (moduleWidth < 1) {
+            handleMakeError("canvas width is too small for this value");
+            return;
+         }
+         const fontPixels = Math.max(1, Math.round(options.fontSize * pixelRatio));
+         const textMarginPixels = Math.round(options.textMargin * pixelRatio);
+         const textHeight = options.showText ? textMarginPixels + Math.ceil(fontPixels * 1.2) : 0;
+         const barHeight = canvasHeight - marginPixels * 2 - textHeight;
+         if (barHeight <= 0) {
+            handleMakeError("canvas height is too small");
+            return;
+         }
+         const usedWidth = totalModules * moduleWidth;
+         const contentLeft = marginPixels + Math.floor((availableWidth - usedWidth) / 2);
+         const barsLeft = contentLeft + options.quietZone * moduleWidth;
+         currentContext.fillStyle = options.backgroundColor;
+         currentContext.fillRect(0, 0, canvasWidth, canvasHeight);
+         currentContext.fillStyle = options.foregroundColor;
+         let index = 0;
+         while (index < currentResult.modules.length) {
+            if (!currentResult.modules[index]) {
+               index++;
+               continue;
+            }
+            const start = index;
+            while (index < currentResult.modules.length && currentResult.modules[index]) index++;
+            currentContext.fillRect(barsLeft + start * moduleWidth, marginPixels, (index - start) * moduleWidth, barHeight);
+         }
+         if (options.showText) {
+            currentContext.fillStyle = options.textColor;
+            currentContext.font = fontPixels.toString() + "px sans-serif";
+            currentContext.textAlign = "center";
+            currentContext.textBaseline = "middle";
+            const displayText = options.displayText == "" ? currentResult.displayText : options.displayText;
+            const textTop = marginPixels + barHeight + textMarginPixels;
+            const textAreaHeight = canvasHeight - marginPixels - textTop;
+            currentContext.fillText(displayText, canvasWidth / 2, textTop + textAreaHeight / 2);
+         }
+         context = currentContext;
+         metrics.value = {
+            pixelRatio,
+            canvasWidth,
+            canvasHeight,
+            moduleWidth,
+            barHeight,
+            quietZone: options.quietZone,
+         };
+         isMaking.value = false;
+         emit("complete");
+      },
+      fail: (error: UniError): void => {
+         if (token != drawToken) return;
+         handleMakeError(error.errMsg);
+      },
+   });
+};
+
+/**
+ * 生成条形码
+ * @returns null
+ */
+const make = (): void => {
+   drawToken++;
+   const token = drawToken;
+   isMaking.value = true;
+   isH5Save.value = false;
+   context = null;
+   metrics.value = null;
+   result.value = null;
+   const options = getResolvedOptions();
+   if (options.foregroundColor == options.backgroundColor) {
+      handleMakeError("foregroundColor and backgroundColor cannot be the same");
+      return;
+   }
+   try {
+      result.value = encodeBarcode(getValue(), props.gs1);
+   } catch (error) {
+      handleMakeError(error instanceof Error ? error.message : "barcode encoding failed");
+      return;
+   }
+   nextTick((): void => {
+      drawCanvas(token);
+   });
+};
+
+/**
+ * 重新生成条形码
+ * @returns null
+ */
+const remake = (): void => {
+   emit("change");
+   make();
+};
+
+/**
+ * 处理导出成功
+ * @param path 临时文件路径
+ * @param shouldSave 是否继续保存到相册
+ * @returns null
+ */
+const handleExportSuccess = (path: string, shouldSave: boolean): void => {
+   isExporting.value = false;
+   tempFilePath.value = path;
+   // #ifdef WEB
+   if (shouldSave) {
+      isH5Save.value = props.h5SaveTip;
+   }
+   emit("export", path);
+   return;
+   // #endif
+   // #ifndef WEB
+   if (!shouldSave) {
+      emit("export", path);
+      return;
+   }
+   uni.saveImageToPhotosAlbum({
+      filePath: path,
+      success: (): void => {
+         emit("save", path);
+      },
+      fail: (error): void => {
+         emit("error", error.errMsg);
+      },
+   });
+   // #endif
+};
+
+/**
+ * 导出条形码 PNG
+ * @param shouldSave 是否继续保存到相册
+ * @returns null
+ */
+const exportImage = (shouldSave: boolean): void => {
+   if (result.value == null || metrics.value == null || context == null || isMaking.value) {
+      emit("error", "make() has not completed");
+      return;
+   }
+   if (isExporting.value) {
+      emit("error", "export is already in progress");
+      return;
+   }
+   isExporting.value = true;
+   // #ifdef WEB
+   const dataUrl = context!.canvas.toDataURL("image/png");
+   if (dataUrl == "") {
+      isExporting.value = false;
+      emit("error", "canvas export returned an empty path");
+      return;
+   }
+   handleExportSuccess(dataUrl, shouldSave);
+   return;
+   // #endif
+   // #ifdef MP-WEIXIN
+   const component = instance == null ? null : instance.proxy;
+   if (component == null) {
+      isExporting.value = false;
+      emit("error", "component is unavailable");
+      return;
+   }
+   uni.canvasToTempFilePath({
+      canvasId,
+      canvas: context!.canvas,
+      fileType: "png",
+      success: (exportResult): void => {
+         if (exportResult.tempFilePath == "") {
+            isExporting.value = false;
+            emit("error", "canvas export returned an empty path");
+            return;
+         }
+         handleExportSuccess(exportResult.tempFilePath, shouldSave);
+      },
+      fail: (error): void => {
+         isExporting.value = false;
+         emit("error", error.errMsg);
+      },
+   }, component);
+   return;
+   // #endif
+   // #if APP-ANDROID || APP-IOS || APP-HARMONY
+   const element = uni.getElementById(rootId);
+   if (element == null) {
+      isExporting.value = false;
+      emit("error", "root element is unavailable");
+      return;
+   }
+   element!.takeSnapshot({
+      type: "file",
+      format: "png",
+      success: (snapshotResult: TakeSnapshotSuccess): void => {
+         handleExportSuccess(snapshotResult.tempFilePath, shouldSave);
+      },
+      fail: (error: TakeSnapshotFail): void => {
+         isExporting.value = false;
+         emit("error", error.errMsg);
+      },
+   });
+   // #endif
+};
+
+/**
+ * 导出条形码临时文件
+ * @returns null
+ */
+const toTempFilePath = (): void => {
+   exportImage(false);
+};
+
+/**
+ * 保存条形码到相册
+ * @returns null
+ */
+const save = (): void => {
+   exportImage(true);
+};
+
+/**
+ * 获取条形码实例快照
+ * @returns Instance
+ */
+const getInstance = (): Instance => {
+   const currentResult = result.value;
+   const currentMetrics = metrics.value;
+   return {
+      value: getValue(),
+      gs1: props.gs1,
+      options: getResolvedOptions(),
+      result: currentResult == null ? null : {
+         codewords: currentResult.codewords.slice(),
+         modules: currentResult.modules.slice(),
+         checksum: currentResult.checksum,
+         displayText: currentResult.displayText,
+      },
+      metrics: currentMetrics == null ? null : {
+         pixelRatio: currentMetrics.pixelRatio,
+         canvasWidth: currentMetrics.canvasWidth,
+         canvasHeight: currentMetrics.canvasHeight,
+         moduleWidth: currentMetrics.moduleWidth,
+         barHeight: currentMetrics.barHeight,
+         quietZone: currentMetrics.quietZone,
+      },
+   };
+};
+
+/**
+ * 关闭 Web 保存提示
+ * @returns null
+ */
+const handleCloseSaveTip = (): void => {
+   isH5Save.value = false;
+};
+
+/**
+ * 转发条形码点击事件
+ * @param event 点击事件
+ * @returns null
+ */
+const handleClick = (event: UniEvent): void => {
+   emit("click", event);
+};
+
+onMounted((): void => {
+   if (props.start) make();
+});
+
+watch(
+   (): (string | number | boolean)[] => [props.value, props.gs1, props.width, props.height],
+   (): void => {
+      if (props.auto) make();
+   },
+);
+
+watch(
+   () => props.options,
+   (): void => {
+      if (props.auto) make();
+   },
+   { deep: true },
+);
+
+defineExpose({ make, remake, toTempFilePath, save, getInstance });
+</script>
+
+<style lang="scss" scoped>
+// 条形码根节点
+.uvx-barcode {
+   position: relative;
+}
+
+// 隐藏状态
+.uvx-barcode--hidden {
+   position: fixed;
+   left: 7500rpx;
+}
+
+// 条形码画布
+.uvx-barcode__canvas {
+   display: flex;
+   flex-direction: column;
+}
+
+// 加载遮罩
+.uvx-barcode__loading {
+   position: absolute;
+   top: 0;
+   right: 0;
+   bottom: 0;
+   left: 0;
+   display: flex;
+   flex-direction: column;
+   align-items: center;
+   justify-content: center;
+   background-color: rgba(255, 255, 255, 0.72);
+}
+
+// Web 保存内容
+.uvx-barcode__save-content {
+   display: flex;
+   flex-direction: column;
+   align-items: center;
+   justify-content: center;
+   width: 100%;
+   height: 100%;
+}
+
+// Web 保存面板
+.uvx-barcode__save-panel {
+   display: flex;
+   flex-direction: column;
+   align-items: center;
+   padding: 24px;
+}
+
+// Web 保存图片
+.uvx-barcode__save-image {
+   width: 320px;
+   background-color: #ffffff;
+}
+
+// Web 保存提示
+.uvx-barcode__save-text {
+   margin-top: 16px;
+   color: #ffffff;
+   font-size: 15px;
+}
+
+</style>

@@ -12,13 +12,13 @@ import type { UserInfo } from '../../types'
 const user = ref<UserInfo | null>(profileStore.getUser())
 const activeTab = ref('home')
 
-// 底部 5 Tab，顺序固定（需求真源）。icon 用 uni-icons 的类型名
+// 底部 5 Tab，顺序固定（需求真源）。icon 用 uvx-icon 的类型名
 const tabs = [
   { key: 'home', name: '首页', icon: 'home' },
-  { key: 'exception', name: '异常', icon: 'info' },
-  { key: 'workbench', name: '工作台', icon: 'gear' },
-  { key: 'todo', name: '待办', icon: 'calendar' },
-  { key: 'mine', name: '我的', icon: 'person' },
+  { key: 'exception', name: '异常', icon: 'warning' },
+  { key: 'workbench', name: '工作台', icon: 'setting' },
+  { key: 'todo', name: '待办', icon: 'list' },
+  { key: 'mine', name: '我的', icon: 'account' },
 ]
 
 // 首页统计卡片
@@ -115,6 +115,11 @@ function switchTab(key: string): void {
   activeTab.value = key
 }
 
+// uvx-tabbar 的 change 事件直接回调选中的 name
+function onTabChange(name: string): void {
+  activeTab.value = name
+}
+
 function openPage(name: string): void {
   uni.showToast({ title: name + '：模块待开发', icon: 'none' })
 }
@@ -148,7 +153,8 @@ onReady(() => {
     <!-- 导航栏用官方 uni-nav-bar（uni-ui x）：自带状态栏安全区、44px 内容区、左右插槽 -->
     <uni-nav-bar :title="currentTabName" hide-default-back navigation-bar-text-style="black"></uni-nav-bar>
 
-    <scroll-view class="body" scroll-y="true" :style="scrollHeight ? 'height:' + scrollHeight : ''">
+    <!-- 蒸汽模式下 scroll-view 默认可滚动，不支持 scroll-y 属性；高度用计算值 -->
+    <scroll-view class="body" :style="scrollHeight ? 'height:' + scrollHeight : ''">
       <!-- ===== 首页：问候 + 统计卡片 + 工单环形图 ===== -->
       <view v-if="activeTab === 'home'" class="pane">
         <view class="hero">
@@ -264,17 +270,16 @@ onReady(() => {
       </view>
     </scroll-view>
 
-    <!-- 底部 5 Tab -->
-    <view class="tabbar">
-      <view v-for="t in tabs" :key="t.key" class="tab" @click="switchTab(t.key)">
-        <uni-icons
-          :type="activeTab === t.key ? t.icon + '-filled' : t.icon"
-          size="20"
-          :color="activeTab === t.key ? '#2f6fe4' : '#94a3b8'"
-        ></uni-icons>
-        <text :class="activeTab === t.key ? 'tab-name tab-name-on' : 'tab-name'">{{ t.name }}</text>
-      </view>
-    </view>
+    <!-- 底部 5 Tab：改用 uvx-tabbar（自带安全区、图标、角标能力） -->
+    <uvx-tabbar :value="activeTab" active-color="#2f6fe4" inactive-color="#94a3b8" @change="onTabChange">
+      <uvx-tabbar-item
+        v-for="t in tabs"
+        :key="t.key"
+        :name="t.key"
+        :text="t.name"
+        :icon="t.icon"
+      ></uvx-tabbar-item>
+    </uvx-tabbar>
   </view>
 </template>
 
@@ -554,27 +559,5 @@ onReady(() => {
 .logout-text {
   font-size: 14px;
   color: #d9534f;
-}
-
-/* 底部 Tab（图标 + 文字） */
-.tabbar {
-  flex-direction: row;
-  height: 54px;
-  background: #ffffff;
-  border-top: 1px solid #e8edf4;
-}
-.tab {
-  flex: 1;
-  align-items: center;
-  justify-content: center;
-}
-.tab-name {
-  margin-top: 3px;
-  font-size: 11px;
-  color: #94a3b8;
-}
-.tab-name-on {
-  color: #2f6fe4;
-  font-weight: 600;
 }
 </style>

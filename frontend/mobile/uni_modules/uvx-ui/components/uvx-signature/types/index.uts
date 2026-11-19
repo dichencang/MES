@@ -1,0 +1,52 @@
+/** 签名工具。 */
+export type SignatureTool = "pen" | "eraser";
+
+/** 签名点，坐标范围为 0 到 1。 */
+export type SignaturePoint = {
+   x: number;
+   y: number;
+};
+
+/** 单条签名笔画。 */
+export type SignatureStroke = {
+   tool: SignatureTool;
+   color: string;
+   width: number;
+   points: SignaturePoint[];
+};
+
+/** 签名内容变化类型。 */
+export type SignatureChangeAction = "stroke" | "undo" | "redo" | "clear";
+
+/** 签名内容变化事件。 */
+export type SignatureChangeEvent = {
+   action: SignatureChangeAction;
+   empty: boolean;
+   canUndo: boolean;
+   canRedo: boolean;
+   strokeCount: number;
+};
+
+/** 组件属性。 */
+export type Props = {
+   width?: string | number;
+   height?: string | number;
+   backgroundColor?: string;
+   penColor?: string;
+   penWidth?: number;
+   eraserWidth?: number;
+   penColors?: string[];
+   penWidths?: number[];
+   showToolbar?: boolean;
+   disabled?: boolean;
+   uStyle?: string;
+   uClass?: string;
+};
+
+/** 组件事件。 */
+export type Emits = {
+   ready: [];
+   change: [event: SignatureChangeEvent];
+   export: [tempFilePath: string];
+   error: [message: string];
+};
