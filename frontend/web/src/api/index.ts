@@ -2,4 +2,5 @@
 // 新业务模块在 modules/ 下新建同名文件（如 plan.ts），再于此处 export * 即可。
 export * from './modules/auth'
 export * from './modules/system'
+export * from './modules/basic'
 export { tokenStore } from './request'

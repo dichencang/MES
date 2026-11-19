@@ -58,6 +58,37 @@ export const PERM = {
     query: 'system:oper-log:query',
     clear: 'system:oper-log:clear',
   },
+  /** 基础数据（契约-基础数据 v1.2 §九）。物料无 query：编辑用弹窗、列表返回全字段 */
+  basic: {
+    material: {
+      list: 'basic:material:list',
+      create: 'basic:material:create',
+      update: 'basic:material:update',
+      setStatus: 'basic:material:set-status',
+    },
+    process: {
+      list: 'basic:process:list',
+      create: 'basic:process:create',
+      update: 'basic:process:update',
+      setStatus: 'basic:process:set-status',
+    },
+    bom: {
+      list: 'basic:bom:list',
+      query: 'basic:bom:query',
+      create: 'basic:bom:create',
+      update: 'basic:bom:update',
+      publish: 'basic:bom:publish',
+      delete: 'basic:bom:delete',
+    },
+    routing: {
+      list: 'basic:routing:list',
+      query: 'basic:routing:query',
+      create: 'basic:routing:create',
+      update: 'basic:routing:update',
+      publish: 'basic:routing:publish',
+      delete: 'basic:routing:delete',
+    },
+  },
 } as const
 
 export type PermCode = string

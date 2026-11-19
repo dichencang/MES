@@ -1,4 +1,7 @@
 // 系统管理模块类型定义。字段与已冻结契约 v1.0 一致：camelCase / ID 字符串 / status·visible 为 "0"·"1"。
+// 基础数据类型在 ./basic.ts，此处统一再导出，方便 `import type { Material } from '@/types'`。
+
+export * from './basic'
 
 export interface ApiResult<T> {
   code: number

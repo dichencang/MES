@@ -22,6 +22,35 @@ const staticRoutes: RouteRecordRaw[] = [
   { path: '/:pathMatch(.*)*', name: 'NotFound', component: () => import('@/views/error/404.vue'), meta: { title: '页面不存在' } },
 ]
 
+/**
+ * 前端自有路由：需要路径参数的编辑/查看页无法由权限树下发（节点 path 是固定绝对路径，没有 params 位置）。
+ * 依据《契约-基础数据》v1.2 §8.1：后端只建 4 个列表 MENU，编辑/详情页由本文件注册。
+ * meta.permCode 为主校验；meta.alsoPerm 为**必须同时具备**的附加校验
+ * （编辑页既要 update 也要 query —— 刷新页面需调详情接口，只有 update 会打不开）。
+ */
+export const extraRoutes: RouteRecordRaw[] = [
+  {
+    path: '/basic/bom/edit/:id', name: 'basic-bom-edit',
+    component: () => import('@/views/basic/bom/Edit.vue'),
+    meta: { title: '编辑 BOM', permCode: 'basic:bom:update', alsoPerm: ['basic:bom:query'] },
+  },
+  {
+    path: '/basic/bom/view/:id', name: 'basic-bom-view',
+    component: () => import('@/views/basic/bom/View.vue'),
+    meta: { title: '查看 BOM', permCode: 'basic:bom:query' },
+  },
+  {
+    path: '/basic/routing/edit/:id', name: 'basic-routing-edit',
+    component: () => import('@/views/basic/routing/Edit.vue'),
+    meta: { title: '编辑工艺路线', permCode: 'basic:routing:update', alsoPerm: ['basic:routing:query'] },
+  },
+  {
+    path: '/basic/routing/view/:id', name: 'basic-routing-view',
+    component: () => import('@/views/basic/routing/View.vue'),
+    meta: { title: '查看工艺路线', permCode: 'basic:routing:query' },
+  },
+]
+
 export const router = createRouter({
   history: createWebHistory(),
   routes: staticRoutes,
@@ -66,6 +95,8 @@ export function addDynamicRoutes(): string {
       children: [
         { path: '', name: 'LayoutHome', redirect: children[0]?.path as string },
         ...children,
+        // 带 :id 的编辑/查看页：权限树下发不了，随 Layout 一起注册
+        ...extraRoutes,
       ],
     })
   }
@@ -97,7 +128,9 @@ router.beforeEach(async (to) => {
       return { path: '/login' }
     }
   }
-  if (!auth.hasPerm((to.meta.permCode as string) ?? '')) return { path: '/403' }
+  // 主编码 + 附加编码都要具备（编辑页需要 update 与 query 双码）
+  const need = [to.meta.permCode as string, ...((to.meta.alsoPerm as string[] | undefined) ?? [])]
+  if (need.some((code) => code && !auth.hasPerm(code))) return { path: '/403' }
   return true
 })
 

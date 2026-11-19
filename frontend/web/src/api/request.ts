@@ -173,6 +173,9 @@ export async function api<T>(config: AxiosRequestConfig): Promise<T> {
 export const get = <T>(url: string, params?: Record<string, unknown>) => api<T>({ method: 'GET', url, params })
 export const post = <T>(url: string, data?: unknown) => api<T>({ method: 'POST', url, data })
 export const put = <T>(url: string, data?: unknown) => api<T>({ method: 'PUT', url, data })
-export const del = <T>(url: string) => api<T>({ method: 'DELETE', url })
+/** DELETE 支持 Query：基础数据删除草稿需带 ?draftToken=…（契约 §4.4 语义 7） */
+export const del = <T>(url: string, params?: Record<string, unknown>) => api<T>({ method: 'DELETE', url, params })
+/** DELETE 支持请求体：部分场景需要 body 传参 */
+export const delWithBody = <T>(url: string, data?: unknown) => api<T>({ method: 'DELETE', url, data })
 
 export default http
