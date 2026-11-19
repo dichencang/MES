@@ -39,8 +39,12 @@
 	// #endif
 </script>
 
-<style>
+<style lang="scss">
 	/*每个页面公共css */
+	/* uvx-ui 的 CSS 变量（--uvx-container 等）定义在 .uvx-light / .uvx-dark 下，
+	   必须先全局引入这份 scss，否则组件里 var(--uvx-xxx) 取不到值 → 背景变透明 */
+	@import './uni_modules/uvx-ui/core/scss/common.scss';
+
 	.uni-row {
 		flex-direction: row;
 	}

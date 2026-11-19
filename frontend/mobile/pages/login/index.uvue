@@ -172,7 +172,7 @@ onUnload(() => {
 
 <template>
   <!-- 用 min-height 而非 height：内容超过一屏时背景跟着长，否则底部会露出根容器白底 -->
-  <view class="page" :style="pageHeight ? 'min-height:' + pageHeight : ''">
+  <view class="page uvx-light" :style="pageHeight ? 'min-height:' + pageHeight : ''">
     <!-- 自绘状态栏占位：navigationStyle=custom 后必须自己避开状态栏，否则内容会顶到刘海/时间下面 -->
     <view :style="'height:' + statusBarHeight + 'px'"></view>
 
@@ -229,7 +229,10 @@ onUnload(() => {
       </view>
 
       <view class="remember-row" @click="remember = !remember">
-        <view :class="remember ? 'checkbox checked' : 'checkbox'"></view>
+        <view :class="remember ? 'checkbox checked' : 'checkbox'">
+          <!-- 选中态必须有对勾，只涂蓝方块用户无法确认是否勾选 -->
+          <view v-if="remember" class="check-mark"></view>
+        </view>
         <text class="remember-text">记住账号</text>
       </view>
       <view class="submit" @click="handleLogin">
@@ -363,10 +366,21 @@ onUnload(() => {
   border: 1px solid #b9cbe0;
   border-radius: 4px;
   margin-right: 8px;
+  align-items: center;
+  justify-content: center;
 }
 .checkbox.checked {
   background: #3488f2;
   border-color: #3488f2;
+}
+/* 对勾用两条边框旋转拼成，uvue 无字体图标依赖，性能好且可自由缩放 */
+.check-mark {
+  width: 8px;
+  height: 4px;
+  border-left: 1.5px solid #ffffff;
+  border-bottom: 1.5px solid #ffffff;
+  transform: rotate(-45deg);
+  margin-top: -2px;
 }
 .remember-text {
   font-size: 13px;

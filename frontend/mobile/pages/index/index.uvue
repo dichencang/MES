@@ -149,7 +149,8 @@ onReady(() => {
 </script>
 
 <template>
-  <view class="page" :style="pageHeight ? 'height:' + pageHeight : ''">
+  <!-- uvx-light 挂载主题 CSS 变量作用域，否则 uvx 组件里 var(--uvx-xxx) 取不到值 -->
+  <view class="page uvx-light" :style="pageHeight ? 'height:' + pageHeight : ''">
     <!-- 导航栏用官方 uni-nav-bar（uni-ui x）：自带状态栏安全区、44px 内容区、左右插槽 -->
     <uni-nav-bar :title="currentTabName" hide-default-back navigation-bar-text-style="black"></uni-nav-bar>
 
