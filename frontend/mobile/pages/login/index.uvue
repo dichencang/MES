@@ -8,20 +8,21 @@ import { BIZ_CODE, LOCAL_CODE } from '../../constants/biz'
 
 const APP_TITLE = 'MES 生产执行系统'
 
-const form = {
+// 注意：必须用 reactive/ref 包裹，否则 uvue 模板不会随状态更新（曾导致验证码区卡在"加载中"）
+const form = reactive({
   username: getRememberedUsername(),
   password: '',
   captchaCode: '',
-}
-const remember = form.username.length > 0
+})
+const remember = ref(form.username.length > 0)
 const loading = ref(false)
-const captcha = {
+const captcha = reactive({
   id: '',
   image: '',
   loading: false,
   failed: false,
   expired: false,
-}
+})
 let seq = 0
 let countdown: number | undefined
 let countdownLeft = 0
@@ -113,7 +114,7 @@ async function handleLogin(): Promise<void> {
       captchaCode: form.captchaCode,
     })
     tokenStore.set(session.accessToken, session.refreshToken)
-    rememberUsername(form.username, remember)
+    rememberUsername(form.username, remember.value)
 
     // 拉取用户信息与权限快照，失败不影响登录（进入主页后再补）
     try {
