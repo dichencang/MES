@@ -52,6 +52,17 @@ async function load() {
   }
 }
 
+/** 合并候选：已选但不在候选里的工序（已停用/未加载）用明细自带名称兜底，避免显示 ID */
+const processMerged = computed(() => {
+  const known = new Set(processChoices.value.map((p) => p.id))
+  const extras = steps.value
+    .filter((s) => s.processId && !known.has(s.processId))
+    .map((s) => ({
+      id: s.processId, code: s.processCode, name: s.processName, status: s.processStatus,
+    }))
+  return [...extras, ...processChoices.value]
+})
+
 async function loadProcessChoices(keyword = '') {
   const res = await processOptions({ keyword: keyword || undefined, page: 1, pageSize: 50 })
   processChoices.value = res.list
@@ -299,13 +310,13 @@ onMounted(async () => {
         </div>
       </div>
 
-      <el-table :data="steps" border size="small" :row-class-name="rowClass">
-        <el-table-column label="序号" width="110">
+      <el-table :data="steps" border size="small" :fit="false" :row-class-name="rowClass">
+        <el-table-column label="序号" width="90">
           <template #default="{ row }">
             <el-input v-model="row.seq" :disabled="!editable" @input="markDirty" />
           </template>
         </el-table-column>
-        <el-table-column label="工序" min-width="220">
+        <el-table-column label="工序" width="280">
           <template #default="{ row }">
             <el-select
               v-if="editable"
@@ -313,25 +324,20 @@ onMounted(async () => {
               filterable
               placeholder="选择工序"
               style="width: 100%"
-              @change="(v: string) => { const hit = processChoices.find((p) => p.id === v); if (hit) { row.processCode = hit.code; row.processName = hit.name; row.processStatus = hit.status } markDirty() }"
+              @change="(v: string) => { const hit = processMerged.find((p) => p.id === v); if (hit) { row.processCode = hit.code; row.processName = hit.name; row.processStatus = hit.status } markDirty() }"
             >
-              <el-option v-for="p in processChoices" :key="p.id" :label="`${p.code} ${p.name}`" :value="p.id" />
+              <el-option v-for="p in processMerged" :key="p.id" :label="`${p.code} ${p.name}`.trim()" :value="p.id" />
             </el-select>
             <span v-else>{{ row.processCode }} {{ row.processName }}</span>
+            <el-tag v-if="row.processStatus === '1'" size="small" type="danger" class="inline-tag">已停用</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="状态" width="90">
-          <template #default="{ row }">
-            <el-tag v-if="row.processStatus === '1'" size="small" type="danger">已停用</el-tag>
-            <span v-else>正常</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="作业说明" min-width="240">
+        <el-table-column label="作业说明" width="260">
           <template #default="{ row }">
             <el-input v-model="row.remark" :disabled="!editable" maxlength="200" @input="markDirty" />
           </template>
         </el-table-column>
-        <el-table-column v-if="editable" label="操作" width="80">
+        <el-table-column v-if="editable" label="操作" width="70">
           <template #default="{ $index }">
             <el-button link type="danger" @click="removeRow($index)">移除</el-button>
           </template>
@@ -359,22 +365,32 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-:deep(.row-error) {
-  background: var(--el-color-danger-light-9);
+:deep(.row-error > td.el-table__cell) {
+  background: var(--el-color-danger-light-9) !important;
 }
 .head {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 16px;
 }
 .head-left {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+.head-right {
+  flex-shrink: 0;
 }
 .title {
   font-size: 16px;
   font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .notice {
   margin-bottom: 12px;
@@ -387,6 +403,9 @@ onMounted(async () => {
 }
 .lines-title {
   font-weight: 600;
+}
+.inline-tag {
+  margin-left: 6px;
 }
 .versions {
   margin-top: 16px;

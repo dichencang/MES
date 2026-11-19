@@ -330,40 +330,32 @@ onMounted(load)
         <el-button v-if="editable" size="small" type="primary" plain @click="addRow">添加子件</el-button>
       </div>
 
-      <el-table :data="items" border size="small" :row-class-name="rowClass">
-        <el-table-column label="#" type="index" width="56" />
-        <el-table-column label="子件" min-width="260">
-          <template #default="{ row, $index }">
+      <el-table :data="items" border size="small" :fit="false" :row-class-name="rowClass">
+        <el-table-column label="#" type="index" width="52" />
+        <el-table-column label="子件" width="300">
+          <template #default="{ row }">
             <MaterialSelect
               v-if="editable"
               v-model="row.materialId"
+              :fallback="`${row.materialCode} ${row.materialName}`.trim()"
               @update:model-value="(v: string) => { row.materialId = v; markDirty() }"
             />
             <span v-else>{{ row.materialCode }} {{ row.materialName }}</span>
+            <el-tag v-if="row.materialStatus === '1'" size="small" type="danger" class="inline-tag">已停用</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="状态" width="80">
-          <template #default="{ row }">
-            <el-tag v-if="row.materialStatus === '1'" size="small" type="danger">已停用</el-tag>
-            <span v-else class="muted">正常</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="单位" width="80">
+        <el-table-column label="单位" width="70">
           <template #default="{ row }">{{ row.unitName || '—' }}</template>
         </el-table-column>
-        <el-table-column label="用量" width="150">
+        <el-table-column label="用量" width="130">
           <template #default="{ row }">
             <el-input v-model="row.qty" :disabled="!editable" @input="markDirty" />
           </template>
         </el-table-column>
-        <el-table-column v-if="editable" label="排序" width="120">
+        <el-table-column v-if="editable" label="操作" width="170">
           <template #default="{ $index }">
             <el-button link :disabled="$index === 0" @click="move($index, -1)">上移</el-button>
             <el-button link :disabled="$index === items.length - 1" @click="move($index, 1)">下移</el-button>
-          </template>
-        </el-table-column>
-        <el-table-column v-if="editable" label="操作" width="80">
-          <template #default="{ $index }">
             <el-button link type="danger" @click="removeRow($index)">移除</el-button>
           </template>
         </el-table-column>
@@ -390,8 +382,8 @@ onMounted(load)
 </template>
 
 <style scoped>
-:deep(.row-error) {
-  background: var(--el-color-danger-light-9);
+:deep(.row-error > td.el-table__cell) {
+  background: var(--el-color-danger-light-9) !important;
 }
 .editor {
   padding: 0;
@@ -400,15 +392,25 @@ onMounted(load)
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 16px;
 }
 .head-left {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+.head-right {
+  flex-shrink: 0;
 }
 .title {
   font-size: 16px;
   font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .meta-form {
   margin-bottom: 8px;
@@ -432,6 +434,9 @@ onMounted(load)
 }
 .muted {
   color: var(--el-text-color-placeholder);
+}
+.inline-tag {
+  margin-left: 6px;
 }
 .versions {
   margin-top: 16px;

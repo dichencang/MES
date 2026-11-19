@@ -97,15 +97,22 @@ onMounted(load)
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 16px;
 }
 .head-left {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
 }
 .title {
   font-size: 16px;
   font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .lines {
   margin-top: 16px;
