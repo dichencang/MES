@@ -205,8 +205,10 @@ onReady(() => {
         <view v-for="g in workGroups" :key="g.key" class="group">
           <text class="group-title">{{ g.title }}</text>
           <view class="group-grid">
-            <view v-for="it in g.items" :key="it.key" class="group-cell" @click="openPage(it.name)">
-              <text class="group-cell-text">{{ it.name }}</text>
+            <view v-for="it in g.items" :key="it.key" class="group-col">
+              <view class="group-cell" @click="openPage(it.name)">
+                <text class="group-cell-text">{{ it.name }}</text>
+              </view>
             </view>
           </view>
         </view>
@@ -270,8 +272,16 @@ onReady(() => {
       </view>
     </scroll-view>
 
-    <!-- 底部 5 Tab：改用 uvx-tabbar（自带安全区、图标、角标能力） -->
-    <uvx-tabbar :value="activeTab" active-color="#2f6fe4" inactive-color="#94a3b8" @change="onTabChange">
+    <!-- 底部 5 Tab：fixed=false 让它参与 flex 布局。
+         uvue 里 position:fixed 不可靠，组件会被渲染到视口外而消失。 -->
+    <uvx-tabbar
+      :value="activeTab"
+      :fixed="false"
+      :placeholder="false"
+      active-color="#2f6fe4"
+      inactive-color="#94a3b8"
+      @change="onTabChange"
+    >
       <uvx-tabbar-item
         v-for="t in tabs"
         :key="t.key"
@@ -417,8 +427,7 @@ onReady(() => {
   color: #a8b4c4;
 }
 
-/* 工作台：分组卡片 + 三列网格。用 space-between 而不是 margin-right，
-   否则 31.5%*3 + 2.75%*3 = 102.75% 超宽，第三列必被挤到下一行。 */
+/* 工作台：分组卡片 + 三列网格 */
 .group {
   margin-bottom: 12px;
   background: #ffffff;
@@ -430,21 +439,25 @@ onReady(() => {
   font-weight: 600;
   color: #8a98aa;
 }
+/* 每项包一层 1/3 宽的列容器，左对齐排列。
+   不用 space-between：两项时会被推到两端，中间撑出一大片空白。 */
 .group-grid {
   flex-direction: row;
   flex-wrap: wrap;
-  justify-content: space-between;
   margin-top: 10px;
 }
+.group-col {
+  width: 33.33%;
+  padding-right: 8px;
+  margin-bottom: 10px;
+}
 .group-cell {
-  width: 31.5%;
   height: 42px;
   flex-direction: row;
   align-items: center;
   justify-content: center;
   border-radius: 8px;
   background: #f5f8fd;
-  margin-bottom: 10px;
 }
 .group-cell-text {
   font-size: 13px;
