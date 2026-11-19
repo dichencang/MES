@@ -12,13 +12,13 @@ import type { UserInfo } from '../../types'
 const user = ref<UserInfo | null>(profileStore.getUser())
 const activeTab = ref('home')
 
-// 底部 5 Tab，顺序固定（需求真源）
+// 底部 5 Tab，顺序固定（需求真源）。icon 用 uni-icons 的类型名
 const tabs = [
-  { key: 'home', name: '首页' },
-  { key: 'exception', name: '异常' },
-  { key: 'workbench', name: '工作台' },
-  { key: 'todo', name: '待办' },
-  { key: 'mine', name: '我的' },
+  { key: 'home', name: '首页', icon: 'home' },
+  { key: 'exception', name: '异常', icon: 'info' },
+  { key: 'workbench', name: '工作台', icon: 'gear' },
+  { key: 'todo', name: '待办', icon: 'calendar' },
+  { key: 'mine', name: '我的', icon: 'person' },
 ]
 
 // 首页统计卡片
@@ -97,20 +97,18 @@ const deptText = computed(() => {
 })
 
 // 页面高度：uvue 根节点需确定高度，flex:1 才有参照
-// scrollHeight = 一屏高 - 状态栏 - 标题栏(44) - 底部 Tab(54)
-// scroll-view 在 uvue 里不吃 flex:1，必须给明确高度，否则会把 Tab 栏挤出屏幕
+// 页面高度：根节点必须有确定高度，子元素才能按 flex 分配剩余空间。
+// 导航栏高度 = 状态栏 + 44（uni-nav-bar 内部已用 padding-top 让出状态栏，这里按同值算滚动区高度）
 const pageHeight = ref(0)
 const scrollHeight = ref(0)
-const statusBarHeight = ref(0)
-const NAV_H = 44
+const NAV_CONTENT_H = 44
 const TAB_H = 54
 function measure(): void {
   const info = uni.getSystemInfoSync()
   const h = (info.windowHeight as number) || 0
   const sb = (info.statusBarHeight as number) || 0
-  statusBarHeight.value = sb
   pageHeight.value = h > 0 ? h + 'px' : ''
-  scrollHeight.value = h > 0 ? h - sb - NAV_H - TAB_H + 'px' : ''
+  scrollHeight.value = h > 0 ? h - sb - NAV_CONTENT_H - TAB_H + 'px' : ''
 }
 
 function switchTab(key: string): void {
@@ -146,13 +144,9 @@ onReady(() => {
 </script>
 
 <template>
-  <view class="page" :style="pageHeight ? 'min-height:' + pageHeight : ''">
-    <view :style="'height:' + statusBarHeight + 'px'"></view>
-
-    <!-- 自绘标题栏：不用系统导航栏，避免 56dp 白条 -->
-    <view class="nav">
-      <text class="nav-title">{{ currentTabName }}</text>
-    </view>
+  <view class="page" :style="pageHeight ? 'height:' + pageHeight : ''">
+    <!-- 导航栏用官方 uni-nav-bar（uni-ui x）：自带状态栏安全区、44px 内容区、左右插槽 -->
+    <uni-nav-bar :title="currentTabName" hide-default-back navigation-bar-text-style="black"></uni-nav-bar>
 
     <scroll-view class="body" scroll-y="true" :style="scrollHeight ? 'height:' + scrollHeight : ''">
       <!-- ===== 首页：问候 + 统计卡片 + 工单环形图 ===== -->
@@ -273,8 +267,12 @@ onReady(() => {
     <!-- 底部 5 Tab -->
     <view class="tabbar">
       <view v-for="t in tabs" :key="t.key" class="tab" @click="switchTab(t.key)">
+        <uni-icons
+          :type="activeTab === t.key ? t.icon + '-filled' : t.icon"
+          size="20"
+          :color="activeTab === t.key ? '#2f6fe4' : '#94a3b8'"
+        ></uni-icons>
         <text :class="activeTab === t.key ? 'tab-name tab-name-on' : 'tab-name'">{{ t.name }}</text>
-        <view :class="activeTab === t.key ? 'tab-line tab-line-on' : 'tab-line'"></view>
       </view>
     </view>
   </view>
@@ -286,17 +284,6 @@ onReady(() => {
   width: 100%;
   flex-direction: column;
   background: #f4f7fb;
-}
-.nav {
-  height: 44px;
-  flex-direction: row;
-  align-items: center;
-  justify-content: center;
-}
-.nav-title {
-  font-size: 17px;
-  font-weight: 600;
-  color: #1f2d3d;
 }
 .body {
   flex: 1;
@@ -569,7 +556,7 @@ onReady(() => {
   color: #d9534f;
 }
 
-/* 底部 Tab */
+/* 底部 Tab（图标 + 文字） */
 .tabbar {
   flex-direction: row;
   height: 54px;
@@ -582,21 +569,12 @@ onReady(() => {
   justify-content: center;
 }
 .tab-name {
-  font-size: 13px;
+  margin-top: 3px;
+  font-size: 11px;
   color: #94a3b8;
 }
 .tab-name-on {
   color: #2f6fe4;
   font-weight: 600;
-}
-.tab-line {
-  width: 16px;
-  height: 2px;
-  border-radius: 1px;
-  margin-top: 5px;
-  background: transparent;
-}
-.tab-line-on {
-  background: #2f6fe4;
 }
 </style>
