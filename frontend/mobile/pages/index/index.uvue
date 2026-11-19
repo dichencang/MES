@@ -1,26 +1,115 @@
 <script setup lang="ts">
-// 落地页：登录后的最小闭环。展示用户快照 + 规划中的 5 个模块入口（暂为占位）。
-// 后续按契约逐模块替换为真实页面，不在此堆业务代码。
+// 移动端主页面：底部 5 Tab（首页 | 异常 | 工作台 | 待办 | 我的）。
+// 各 Tab 内容严格依据需求真源《四、移动端页面结构》：
+//   首页 = 问候 + 统计卡片（昨日产量/达成率/合格率/返工/订单/出库）+ 工单环形图
+//   工作台 = 功能入口目录（计划管理 / 生产管理 / 质量管理 / 仓库管理）
+//   异常 = 异常上报 + 列表；待办 = 待办列表；我的 = 个人信息/今日任务/资料/改密/关于/退出
+// 注意：后端尚无看板统计接口，首页数值为占位，接口就绪后替换。
 import { logout } from '../../api/auth'
 import { tokenStore, profileStore } from '../../utils/auth'
 import type { UserInfo } from '../../types'
 
 const user = ref<UserInfo | null>(profileStore.getUser())
+const activeTab = ref('home')
 
-const entries = [
-  { key: 'home', name: '首页', desc: '生产总览与快捷入口' },
-  { key: 'exception', name: '异常', desc: '异常上报与处理' },
-  { key: 'workbench', name: '工作台', desc: '扫码报工与质检' },
-  { key: 'todo', name: '待办', desc: '我的待处理任务' },
-  { key: 'mine', name: '我的', desc: '个人信息与设置' },
+// 底部 5 Tab，顺序固定（需求真源）
+const tabs = [
+  { key: 'home', name: '首页' },
+  { key: 'exception', name: '异常' },
+  { key: 'workbench', name: '工作台' },
+  { key: 'todo', name: '待办' },
+  { key: 'mine', name: '我的' },
 ]
+
+// 首页统计卡片
+const stats = [
+  { key: 'output', label: '昨日产量', value: '—' },
+  { key: 'rate', label: '达成率', value: '—' },
+  { key: 'qualified', label: '合格率', value: '—' },
+  { key: 'rework', label: '返工', value: '—' },
+  { key: 'order', label: '订单', value: '—' },
+  { key: 'outbound', label: '出库', value: '—' },
+]
+
+// 工作台功能入口目录
+const workGroups = [
+  {
+    key: 'plan',
+    title: '计划管理',
+    items: [
+      { key: 'so', name: '销售订单' },
+      { key: 'plan', name: '生产计划' },
+    ],
+  },
+  {
+    key: 'prod',
+    title: '生产管理',
+    items: [
+      { key: 'wo', name: '生产工单' },
+      { key: 'report', name: '生产报工' },
+      { key: 'reportLog', name: '报工记录' },
+    ],
+  },
+  {
+    key: 'qc',
+    title: '质量管理',
+    items: [
+      { key: 'iqc', name: '来料检验' },
+      { key: 'ipqc', name: '过程检验' },
+      { key: 'fqc', name: '最终检验' },
+    ],
+  },
+  {
+    key: 'wh',
+    title: '仓库管理',
+    items: [
+      { key: 'in', name: '采购入库' },
+      { key: 'pick', name: '生产领料' },
+      { key: 'return', name: '生产退料' },
+      { key: 'out', name: '产品出库' },
+      { key: 'stock', name: '库存查询' },
+    ],
+  },
+]
+
+const currentTabName = computed(() => {
+  const t = tabs.find((x) => x.key === activeTab.value)
+  return t ? t.name : '首页'
+})
+
+const greeting = computed(() => {
+  const h = new Date().getHours()
+  if (h < 11) return '早上好'
+  if (h < 14) return '中午好'
+  if (h < 18) return '下午好'
+  return '晚上好'
+})
 
 const rolesText = computed(() => {
   if (!user.value) return '—'
   return user.value.roles.map((r) => r.roleName).join('、') || '—'
 })
 
-function openEntry(name: string): void {
+const deptText = computed(() => {
+  if (!user.value) return '未分配部门'
+  return user.value.deptName ? user.value.deptName : '未分配部门'
+})
+
+// 页面高度：uvue 根节点需确定高度，flex:1 才有参照
+const pageHeight = ref(0)
+const statusBarHeight = ref(0)
+function measure(): void {
+  const info = uni.getSystemInfoSync()
+  const h = (info.windowHeight as number) || 0
+  pageHeight.value = h > 0 ? h + 'px' : ''
+  statusBarHeight.value = (info.statusBarHeight as number) || 0
+}
+
+function switchTab(key: string): void {
+  activeTab.value = key
+}
+
+function openPage(name: string): void {
   uni.showToast({ title: name + '：模块待开发', icon: 'none' })
 }
 
@@ -38,120 +127,466 @@ async function handleLogout(): Promise<void> {
 onLoad(() => {
   if (!tokenStore.access) {
     uni.reLaunch({ url: '/pages/login/index' })
+    return
   }
+  measure()
+})
+
+onReady(() => {
+  measure()
 })
 </script>
 
 <template>
-  <view class="page">
-    <view class="hero">
-      <text class="hello">你好，{{ user ? user.realName : '用户' }}</text>
-      <text class="meta">{{ user && user.deptName ? user.deptName : '未分配部门' }} · {{ rolesText }}</text>
+  <view class="page" :style="pageHeight ? 'min-height:' + pageHeight : ''">
+    <view :style="'height:' + statusBarHeight + 'px'"></view>
+
+    <!-- 自绘标题栏：不用系统导航栏，避免 56dp 白条 -->
+    <view class="nav">
+      <text class="nav-title">{{ currentTabName }}</text>
     </view>
 
-    <view class="section-title">功能入口</view>
-    <view class="grid">
-      <view v-for="item in entries" :key="item.key" class="entry" @click="openEntry(item.name)">
-        <view class="entry-mark">{{ item.name.slice(0, 1) }}</view>
-        <text class="entry-name">{{ item.name }}</text>
-        <text class="entry-desc">{{ item.desc }}</text>
+    <scroll-view class="body" scroll-y="true">
+      <!-- ===== 首页：问候 + 统计卡片 + 工单环形图 ===== -->
+      <view v-if="activeTab === 'home'" class="pane">
+        <view class="hero">
+          <text class="hero-greet">{{ greeting }}，{{ user ? user.realName : '用户' }}</text>
+          <text class="hero-meta">{{ deptText }}</text>
+        </view>
+
+        <view class="stat-grid">
+          <view v-for="s in stats" :key="s.key" class="stat-cell">
+            <text class="stat-value">{{ s.value }}</text>
+            <text class="stat-label">{{ s.label }}</text>
+          </view>
+        </view>
+
+        <view class="chart-card">
+          <text class="chart-title">工单状态分布</text>
+          <view class="chart-body">
+            <view class="donut">
+              <view class="donut-hole">
+                <text class="donut-num">—</text>
+                <text class="donut-unit">工单</text>
+              </view>
+            </view>
+            <view class="legend">
+              <view class="legend-row">
+                <view class="legend-dot dot-pending"></view>
+                <text class="legend-name">待排</text>
+                <text class="legend-val">—</text>
+              </view>
+              <view class="legend-row">
+                <view class="legend-dot dot-running"></view>
+                <text class="legend-name">生产中</text>
+                <text class="legend-val">—</text>
+              </view>
+              <view class="legend-row">
+                <view class="legend-dot dot-done"></view>
+                <text class="legend-name">已完成</text>
+                <text class="legend-val">—</text>
+              </view>
+            </view>
+          </view>
+          <text class="chart-tip">统计接口就绪后展示真实数据</text>
+        </view>
+      </view>
+
+      <!-- ===== 工作台：功能入口目录 ===== -->
+      <view v-if="activeTab === 'workbench'" class="pane">
+        <view v-for="g in workGroups" :key="g.key" class="group">
+          <text class="group-title">{{ g.title }}</text>
+          <view class="group-items">
+            <view v-for="it in g.items" :key="it.key" class="group-item" @click="openPage(it.name)">
+              <text class="group-item-text">{{ it.name }}</text>
+              <text class="group-item-arrow">›</text>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <!-- ===== 异常 ===== -->
+      <view v-if="activeTab === 'exception'" class="pane">
+        <view class="action-row">
+          <view class="action-btn" @click="openPage('异常上报')">
+            <text class="action-btn-text">异常上报</text>
+          </view>
+        </view>
+        <view class="empty">
+          <text class="empty-title">暂无异常记录</text>
+          <text class="empty-desc">异常列表与处理功能待开发</text>
+        </view>
+      </view>
+
+      <!-- ===== 待办 ===== -->
+      <view v-if="activeTab === 'todo'" class="pane">
+        <view class="empty">
+          <text class="empty-title">暂无待办</text>
+          <text class="empty-desc">待办列表与处理功能待开发</text>
+        </view>
+      </view>
+
+      <!-- ===== 我的 ===== -->
+      <view v-if="activeTab === 'mine'" class="pane">
+        <view class="me-card">
+          <view class="me-avatar">
+            <text class="me-avatar-text">{{ user ? user.realName.slice(0, 1) : '用' }}</text>
+          </view>
+          <view class="me-info">
+            <text class="me-name">{{ user ? user.realName : '用户' }}</text>
+            <text class="me-sub">{{ deptText }} · {{ rolesText }}</text>
+          </view>
+        </view>
+
+        <view class="menu-card">
+          <view class="menu-row" @click="openPage('今日任务')">
+            <text class="menu-label">今日任务</text>
+            <text class="menu-arrow">›</text>
+          </view>
+          <view class="menu-row" @click="openPage('个人资料')">
+            <text class="menu-label">个人资料</text>
+            <text class="menu-arrow">›</text>
+          </view>
+          <view class="menu-row" @click="openPage('修改密码')">
+            <text class="menu-label">修改密码</text>
+            <text class="menu-arrow">›</text>
+          </view>
+          <view class="menu-row menu-row-last" @click="openPage('关于')">
+            <text class="menu-label">关于</text>
+            <text class="menu-arrow">›</text>
+          </view>
+        </view>
+
+        <view class="logout" @click="handleLogout">
+          <text class="logout-text">退出登录</text>
+        </view>
+      </view>
+    </scroll-view>
+
+    <!-- 底部 5 Tab -->
+    <view class="tabbar">
+      <view v-for="t in tabs" :key="t.key" class="tab" @click="switchTab(t.key)">
+        <text :class="activeTab === t.key ? 'tab-name tab-name-on' : 'tab-name'">{{ t.name }}</text>
+        <view :class="activeTab === t.key ? 'tab-line tab-line-on' : 'tab-line'"></view>
       </view>
     </view>
-
-    <view class="footer-info">
-      <text class="footer-text">后端接口已连通 · 业务模块待开发</text>
-    </view>
-
-    <button class="logout" @click="handleLogout">退出登录</button>
   </view>
 </template>
 
 <style>
-/* uvue CSS 受限子集：只支持 classname 选择器、display 仅 flex/none、无 100vh / 角度渐变 / gap / calc */
+/* uvue CSS 子集：仅 classname 选择器、display 仅 flex/none、无 100vh / 角度渐变 / gap / calc */
 .page {
+  width: 100%;
+  flex-direction: column;
   background: #f4f7fb;
-  padding: 24px 16px;
 }
-.hero {
-  background: linear-gradient(to bottom right, #2f6fe4, #4a8cf7);
-  border-radius: 16px;
-  padding: 22px 18px;
-  margin-bottom: 22px;
+.nav {
+  height: 44px;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
 }
-.hello {
-  display: flex;
-  color: #ffffff;
-  font-size: 20px;
-  font-weight: 700;
-}
-.meta {
-  display: flex;
-  margin-top: 8px;
-  color: rgba(255, 255, 255, 0.82);
-  font-size: 12px;
-}
-.section-title {
-  font-size: 15px;
+.nav-title {
+  font-size: 17px;
   font-weight: 600;
   color: #1f2d3d;
-  margin-bottom: 12px;
 }
-.grid {
+.body {
+  flex: 1;
+}
+.pane {
+  padding: 8px 16px 16px;
+}
+
+/* 首页 */
+.hero {
+  padding: 4px 2px 14px;
+}
+.hero-greet {
+  display: flex;
+  font-size: 19px;
+  font-weight: 700;
+  color: #1c477e;
+}
+.hero-meta {
+  display: flex;
+  margin-top: 4px;
+  font-size: 12px;
+  color: #8a98aa;
+}
+.stat-grid {
   flex-direction: row;
   flex-wrap: wrap;
   justify-content: space-between;
 }
-.entry {
-  width: 48%;
+.stat-cell {
+  width: 31.5%;
   background: #ffffff;
   border-radius: 12px;
-  padding: 16px 14px;
-  margin-bottom: 12px;
-  box-shadow: 0 4px 14px rgba(52, 105, 176, 0.06);
-}
-.entry-mark {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  background: #eaf3ff;
-  color: #2f6fe4;
-  font-size: 14px;
-  font-weight: 700;
-  text-align: center;
-  line-height: 32px;
+  padding: 14px 10px;
   margin-bottom: 10px;
+  align-items: center;
 }
-.entry-name {
-  display: flex;
-  font-size: 14px;
-  font-weight: 600;
-  color: #263b55;
+.stat-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: #2f6fe4;
 }
-.entry-desc {
-  display: flex;
+.stat-label {
   margin-top: 4px;
   font-size: 11px;
   color: #94a3b8;
-  line-height: 1.5;
 }
-.footer-info {
-  margin-top: 20px;
-  text-align: center;
+.chart-card {
+  margin-top: 6px;
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 16px 14px;
 }
-.footer-text {
+.chart-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2d3d;
+}
+.chart-body {
+  flex-direction: row;
+  align-items: center;
+  margin-top: 14px;
+}
+.donut {
+  width: 108px;
+  height: 108px;
+  border-radius: 54px;
+  background: #dfeaff;
+  align-items: center;
+  justify-content: center;
+}
+.donut-hole {
+  width: 72px;
+  height: 72px;
+  border-radius: 36px;
+  background: #ffffff;
+  align-items: center;
+  justify-content: center;
+}
+.donut-num {
+  font-size: 18px;
+  font-weight: 700;
+  color: #2f6fe4;
+}
+.donut-unit {
+  font-size: 10px;
+  color: #94a3b8;
+}
+.legend {
+  flex: 1;
+  margin-left: 18px;
+}
+.legend-row {
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 4px;
+  margin-right: 8px;
+}
+.dot-pending {
+  background: #b9cbe0;
+}
+.dot-running {
+  background: #4a8cf7;
+}
+.dot-done {
+  background: #22b07d;
+}
+.legend-name {
+  flex: 1;
+  font-size: 12px;
+  color: #5e7695;
+}
+.legend-val {
+  font-size: 12px;
+  font-weight: 600;
+  color: #263b55;
+}
+.chart-tip {
+  margin-top: 10px;
   font-size: 11px;
   color: #a8b4c4;
 }
-.logout {
-  width: 100%;
+
+/* 工作台 */
+.group {
+  margin-bottom: 14px;
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 14px 14px 6px;
+}
+.group-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #8a98aa;
+}
+.group-items {
+  margin-top: 6px;
+}
+.group-item {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-top: 1px solid #f2f5f9;
+}
+.group-item-text {
+  font-size: 14px;
+  color: #263b55;
+}
+.group-item-arrow {
+  font-size: 15px;
+  color: #c4cfdd;
+}
+
+/* 异常 */
+.action-row {
+  flex-direction: row;
+  margin-bottom: 14px;
+}
+.action-btn {
+  flex: 1;
   height: 44px;
-  margin-top: 24px;
-  border: 1px solid #e1e8f1;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: linear-gradient(to right, #3299f8 0%, #2878ec 100%);
+}
+.action-btn-text {
+  font-size: 14px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+/* 空态 */
+.empty {
+  margin-top: 70px;
+  align-items: center;
+}
+.empty-title {
+  font-size: 15px;
+  color: #5e7695;
+}
+.empty-desc {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #a8b4c4;
+}
+
+/* 我的 */
+.me-card {
+  flex-direction: row;
+  align-items: center;
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 16px 14px;
+}
+.me-avatar {
+  width: 46px;
+  height: 46px;
+  border-radius: 23px;
+  background: #e8f1ff;
+  align-items: center;
+  justify-content: center;
+  margin-right: 12px;
+}
+.me-avatar-text {
+  font-size: 17px;
+  font-weight: 700;
+  color: #2f6fe4;
+}
+.me-info {
+  flex: 1;
+}
+.me-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2d3d;
+}
+.me-sub {
+  display: flex;
+  margin-top: 4px;
+  font-size: 11px;
+  color: #8a98aa;
+}
+.menu-card {
+  margin-top: 12px;
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 0 14px;
+}
+.menu-row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 0;
+  border-bottom: 1px solid #f2f5f9;
+}
+.menu-row-last {
+  border-bottom: 0;
+}
+.menu-label {
+  font-size: 14px;
+  color: #263b55;
+}
+.menu-arrow {
+  font-size: 15px;
+  color: #c4cfdd;
+}
+.logout {
+  margin-top: 16px;
+  height: 46px;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
   border-radius: 10px;
   background: #ffffff;
-  color: #6b7c93;
+  border: 1px solid #e6ebf2;
+}
+.logout-text {
   font-size: 14px;
-  line-height: 44px;
-  text-align: center;
+  color: #d9534f;
+}
+
+/* 底部 Tab */
+.tabbar {
+  flex-direction: row;
+  height: 54px;
+  background: #ffffff;
+  border-top: 1px solid #e8edf4;
+}
+.tab {
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+}
+.tab-name {
+  font-size: 13px;
+  color: #94a3b8;
+}
+.tab-name-on {
+  color: #2f6fe4;
+  font-weight: 600;
+}
+.tab-line {
+  width: 16px;
+  height: 2px;
+  border-radius: 1px;
+  margin-top: 5px;
+  background: transparent;
+}
+.tab-line-on {
+  background: #2f6fe4;
 }
 </style>

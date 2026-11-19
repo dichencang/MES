@@ -160,13 +160,19 @@ onLoad(() => {
   loadCaptcha()
 })
 
+onReady(() => {
+  // 首帧可能拿不到状态栏高度，渲染完成后再量一次
+  measure()
+})
+
 onUnload(() => {
   stopCountdown()
 })
 </script>
 
 <template>
-  <view class="page" :style="pageHeight ? 'height:' + pageHeight : ''">
+  <!-- 用 min-height 而非 height：内容超过一屏时背景跟着长，否则底部会露出根容器白底 -->
+  <view class="page" :style="pageHeight ? 'min-height:' + pageHeight : ''">
     <!-- 自绘状态栏占位：navigationStyle=custom 后必须自己避开状态栏，否则内容会顶到刘海/时间下面 -->
     <view :style="'height:' + statusBarHeight + 'px'"></view>
 
@@ -240,6 +246,7 @@ onUnload(() => {
 <style>
 /* uvue CSS 受限子集：只支持 classname 选择器、display 仅 flex/none、无 100vh / 角度渐变 / gap */
 .page {
+  width: 100%;
   background: linear-gradient(to bottom, #edf5ff 0%, #f8fbff 42%, #e7f1ff 100%);
   padding: 10px 20px 16px;
 }

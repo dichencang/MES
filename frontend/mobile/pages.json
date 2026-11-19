@@ -10,7 +10,8 @@
 		{
 			"path": "pages/index/index",
 			"style": {
-				"navigationBarTitleText": "工作台"
+				"navigationBarTitleText": "工作台",
+				"navigationStyle": "custom"
 			}
 		}
 	],
