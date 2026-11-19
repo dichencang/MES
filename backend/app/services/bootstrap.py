@@ -3,6 +3,7 @@ from sqlalchemy.dialects.postgresql import insert
 
 from app.config.settings import settings
 from app.models import system as m
+from app.models.basic_seed import seed_statements
 from app.models.seed_data import BUSINESS_MODULES, PERMISSIONS
 from app.utils.passwords import hash_password
 
@@ -43,6 +44,8 @@ async def seed_business_permissions(connection):
             f"{module}:{resource}:list", parent_id=parent_id, perm_name=menu,
             perm_type="MENU", path=path, component=f"{module}/index", icon=icon,
         )
+    for statement in seed_statements():
+        await connection.execute(statement)
 
 
 async def seed_system(connection):

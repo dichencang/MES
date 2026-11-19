@@ -8,20 +8,32 @@ def success(data=None):
 
 
 class ApiError(Exception):
-    def __init__(self, status, code, message):
+    def __init__(self, status, code, message, data=None):
         self.status, self.code, self.message = status, code, message
+        self.data = data
 
 
 async def api_error_handler(request: Request, error: ApiError):
     return JSONResponse(
         status_code=error.status,
-        content={"code": error.code, "message": error.message, "data": None},
+        content={"code": error.code, "message": error.message, "data": error.data},
     )
 
 
 async def validation_error_handler(request: Request, error: RequestValidationError):
+    def field_path(parts):
+        if request.scope["path"].split("/")[1] not in {"materials", "processes", "boms", "routings"}:
+            return ".".join(map(str, parts))
+        path = ""
+        for part in parts:
+            if isinstance(part, int):
+                path += f"[{part}]"
+            else:
+                path += f".{part}" if path else part
+        return path
+
     errors = [
-        {"field": ".".join(map(str, item["loc"][1:])), "message": "参数无效"}
+        {"field": field_path(item["loc"][1:]), "message": "参数无效"}
         for item in error.errors()
     ]
     return JSONResponse(

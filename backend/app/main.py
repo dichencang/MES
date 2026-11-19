@@ -10,6 +10,7 @@ from redis.asyncio import Redis
 from app.config.database import engine
 from app.config.settings import settings
 from app.routers.auth import router
+from app.routers.basic import router as basic_router
 from app.routers.changes import router as changes_router
 from app.routers.management import router as management_router
 from app.routers.system import router as system_router
@@ -53,3 +54,4 @@ app.include_router(router)
 app.include_router(system_router)
 app.include_router(management_router)
 app.include_router(changes_router)
+app.include_router(basic_router)

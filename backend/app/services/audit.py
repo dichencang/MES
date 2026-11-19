@@ -12,10 +12,11 @@ MODULE_NAMES = {
     "users": "用户管理", "roles": "角色管理", "permissions": "权限管理",
     "depts": "组织架构", "dict-types": "数据字典", "dict-data": "数据字典",
     "configs": "系统参数", "oper-logs": "操作日志", "auth": "认证",
+    "materials": "物料档案", "processes": "工序档案", "boms": "产品 BOM", "routings": "工艺路线",
 }
 SECRET_KEYS = {
     "password", "oldpassword", "newpassword", "refreshtoken", "accesstoken", "authorization",
-    "captchaid", "captchacode",
+    "captchaid", "captchacode", "drafttoken",
 }
 
 
