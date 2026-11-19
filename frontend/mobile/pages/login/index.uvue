@@ -224,12 +224,12 @@ onUnload(() => {
 /* uvue CSS 受限子集：只支持 classname 选择器、display 仅 flex/none、无 100vh / 角度渐变 / gap */
 .page {
   background: linear-gradient(to bottom, #edf5ff 0%, #f8fbff 42%, #e7f1ff 100%);
-  padding: 40px 20px 24px;
+  padding: 18px 20px 16px;
 }
 .brand {
   flex-direction: row;
   align-items: center;
-  padding: 4px 4px 18px;
+  padding: 2px 4px 14px;
 }
 .logo {
   width: 40px;
@@ -261,7 +261,7 @@ onUnload(() => {
 .card {
   background: #ffffff;
   border-radius: 18px;
-  padding: 24px 20px 20px;
+  padding: 22px 20px 18px;
   box-shadow: 0 12px 32px rgba(52, 105, 176, 0.12);
 }
 .card-title {
@@ -280,9 +280,9 @@ onUnload(() => {
 }
 .input {
   width: 100%;
-  height: 46px;
+  height: 44px;
   padding: 0 12px;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
   border: 1px solid #e1e8f1;
   border-radius: 10px;
   background: #fbfdff;
@@ -299,7 +299,7 @@ onUnload(() => {
 }
 .captcha-box {
   width: 118px;
-  height: 46px;
+  height: 44px;
   margin-left: 10px;
   border: 1px solid #e1e8f1;
   border-radius: 10px;
@@ -318,8 +318,8 @@ onUnload(() => {
 .remember-row {
   flex-direction: row;
   align-items: center;
-  margin-top: 18px;
-  margin-bottom: 20px;
+  margin-top: 14px;
+  margin-bottom: 16px;
 }
 .checkbox {
   width: 16px;
@@ -350,8 +350,8 @@ onUnload(() => {
   text-align: center;
 }
 .dev-tip {
-  margin-top: 18px;
-  padding: 10px;
+  margin-top: 14px;
+  padding: 8px;
   border-radius: 8px;
   background: #fff8e9;
 }
