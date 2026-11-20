@@ -26,23 +26,16 @@ async def seed_business_permissions(connection):
         await connection.execute(insert(permission).values(
             permission_code=code, **fields,
         ).on_conflict_do_nothing(index_elements=[permission.c.permission_code]))
-        return await connection.scalar(select(permission.c.id).where(
-            permission.c.permission_code == code,
-        ))
 
     await ensure_node(
         "home:workbench:list", perm_name="工作台", perm_type="MENU",
         path="/home", component="home/index", icon="Odometer",
     )
-    for order, (module, directory, menu, resource, icon) in enumerate(BUSINESS_MODULES, 1):
+    for order, (module, directory, icon) in enumerate(BUSINESS_MODULES, 1):
         path = f"/{module}"
-        parent_id = await ensure_node(
+        await ensure_node(
             module, perm_name=directory, perm_type="DIR",
             path=path, icon=icon, order_num=order,
-        )
-        await ensure_node(
-            f"{module}:{resource}:list", parent_id=parent_id, perm_name=menu,
-            perm_type="MENU", path=path, component=f"{module}/index", icon=icon,
         )
     for statement in seed_statements():
         await connection.execute(statement)
