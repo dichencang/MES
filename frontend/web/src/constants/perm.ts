@@ -108,6 +108,21 @@ export const PERM = {
       list: 'plan:gantt:list',
     },
   },
+  /** 生产工单（契约-生产工单 v1.0 §二）。详情与事件复用 list 码；complete/close 本期仅预留 */
+  workorder: {
+    list: 'workorder:list',
+    create: 'workorder:create',
+    update: 'workorder:update',
+    release: 'workorder:release',
+    assign: 'workorder:assign',
+    start: 'workorder:start',
+    cancel: 'workorder:cancel',
+    complete: 'workorder:complete',
+    close: 'workorder:close',
+    gantt: {
+      list: 'workorder:gantt:list',
+    },
+  },
 } as const
 
 export type PermCode = string

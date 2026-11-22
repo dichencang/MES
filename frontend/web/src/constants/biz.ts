@@ -30,8 +30,29 @@ export const PLAN_BIZ_CODE = {
   STATE_CONFLICT: 4100,
 } as const
 
-/** 前端本地错误码：网络异常 / 超时时使用，不与后端码冲突 */
-export const LOCAL_CODE = {
+/** 生产工单专用字符串业务码（HTTP 409，契约-生产工单 §五）。状态冲突沿用数字 4100 */
+export const WORK_ORDER_BIZ_CODE = {
+  MISSING_PRODUCTION_DEFINITION: 'MISSING_PRODUCTION_DEFINITION',
+  WORK_ORDER_QUANTITY_INVALID: 'WORK_ORDER_QUANTITY_INVALID',
+  STATE_CONFLICT: 4100,
+} as const
+
+/** 工单动作禁用原因兜底文案（契约 §4.3）；后端给 message 优先，此处仅兜底 */
+export const WO_REASON_FALLBACK: Record<string, string> = {
+  WORK_ORDER_CANCELLED: '工单已撤销',
+  WORK_ORDER_NOT_RELEASED: '工单尚未下发',
+  WORK_ORDER_ALREADY_RELEASED: '工单已下发，不可修改或重复下发',
+  WORK_ORDER_ALREADY_STARTED: '工单已开工，不可重复开工或撤销',
+  WORK_ORDER_STEP_STARTED: '该工序已开工，不可改派',
+  WORK_ORDER_HAS_WIP: '存在在制量未处置',
+  WORK_ORDER_NOT_STARTED: '工单未开工',
+  WORK_ORDER_TERMINAL: '工单已完成或已关闭',
+  PLAN_LINKED_WORK_ORDER: '来源计划工单，不可编辑',
+  PLAN_CANCELLED: '来源计划已取消',
+  WORK_ORDER_SETTLEMENT_DISABLED: '完工及关闭尚未开放',
+}
+
+/** 前端本地错误码：网络异常 / 超时时使用，不与后端码冲突 */export const LOCAL_CODE = {
   NETWORK: -1,
   TIMEOUT: -2,
 } as const

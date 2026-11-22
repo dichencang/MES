@@ -39,6 +39,7 @@ type WorkGroup = { key: string; title: string; items: WorkItem[] }
 function entryPerm(key: string): string {
   if (key === 'so') return 'plan:sales-order:list'
   if (key === 'plan') return 'plan:production-plan:list'
+  if (key === 'wo') return 'workorder:list'
   return ''
 }
 
@@ -158,6 +159,10 @@ function openPage(name: string, key: string): void {
   }
   if (key === 'plan') {
     uni.navigateTo({ url: '/pages/plan/production-plan-list' })
+    return
+  }
+  if (key === 'wo') {
+    uni.navigateTo({ url: '/pages/workorder/list' })
     return
   }
   uni.showToast({ title: name + '：模块待开发', icon: 'none' })

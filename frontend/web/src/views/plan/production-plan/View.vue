@@ -151,8 +151,10 @@ onMounted(load)
       <el-divider content-position="left">关联工单</el-divider>
       <div v-if="detail.workOrder" class="workorder">
         <span>工单 {{ detail.workOrder.workOrderNo }}</span>
-        <!-- 查看链接由前端按工单模块路由拼接；工单模块交付后启用 -->
-        <el-button link type="primary" disabled>查看工单（工单模块交付后启用）</el-button>
+        <el-button
+          link type="primary"
+          @click="router.push(`/workorder/detail/${detail.workOrder.id}`)"
+        >查看工单</el-button>
       </div>
       <el-empty v-else description="暂无关联工单" :image-size="60" />
     </template>

@@ -75,6 +75,22 @@ export const extraRoutes: RouteRecordRaw[] = [
     component: () => import('@/views/plan/production-plan/Edit.vue'),
     meta: { title: '编辑排期', permCode: 'plan:production-plan:update' },
   },
+  // 生产工单：详情/新建/编辑带参数或需专用权限，由前端静态声明（契约-生产工单 §六）
+  {
+    path: '/workorder/create', name: 'workorder-create',
+    component: () => import('@/views/workorder/Edit.vue'),
+    meta: { title: '新建工单', permCode: 'workorder:create' },
+  },
+  {
+    path: '/workorder/edit/:id', name: 'workorder-edit',
+    component: () => import('@/views/workorder/Edit.vue'),
+    meta: { title: '编辑工单', permCode: 'workorder:update', alsoPerm: ['workorder:list'] },
+  },
+  {
+    path: '/workorder/detail/:id', name: 'workorder-detail',
+    component: () => import('@/views/workorder/View.vue'),
+    meta: { title: '工单详情', permCode: 'workorder:list' },
+  },
 ]
 
 export const router = createRouter({

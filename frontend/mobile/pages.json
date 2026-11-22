@@ -42,6 +42,20 @@
 				"navigationBarTitleText": "计划详情",
 				"navigationStyle": "custom"
 			}
+		},
+		{
+			"path": "pages/workorder/list",
+			"style": {
+				"navigationBarTitleText": "生产工单",
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/workorder/detail",
+			"style": {
+				"navigationBarTitleText": "工单详情",
+				"navigationStyle": "custom"
+			}
 		}
 	],
 	"globalStyle": {

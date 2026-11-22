@@ -3,6 +3,7 @@
 
 export * from './basic'
 export * from './plan'
+export * from './workorder'
 
 export interface ApiResult<T> {
   /** 成功/通用错误为数字码；部分业务冲突为字符串码（契约-计划管理 §5.1） */
