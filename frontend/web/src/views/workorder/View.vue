@@ -10,6 +10,7 @@ import {
   cancelWorkOrder, getWorkOrder, listAssigneeOptions, listWorkOrderEvents,
   releaseWorkOrder, setStepAssignees, startWorkOrder,
 } from '@/api'
+import { BIZ_CODE } from '@/constants/biz'
 import { PERM } from '@/constants/perm'
 import { useAuthStore } from '@/stores/auth'
 import {
@@ -18,7 +19,7 @@ import {
   type WorkOrderMaterial, type WorkOrderStatus, type WorkOrderStep,
 } from '@/types'
 import { formatUtcShanghai } from '@/utils/time'
-import { ApiError, reasonText } from './components/feedback'
+import { ApiError, paramError, reasonText } from './components/feedback'
 
 const route = useRoute()
 const router = useRouter()
@@ -131,6 +132,10 @@ async function submitAssign() {
     ElMessage.success('派工已更新')
     assignDrawer.value = false
   } catch (e) {
+    if (e instanceof ApiError && e.code === BIZ_CODE.INVALID_PARAM) {
+      ElMessage.warning(paramError(e.data, 'assigneeIds'))
+      return
+    }
     if (e instanceof ApiError && e.code === 4100) {
       const reason = (e.data as { reason?: { code: string; message: string } } | undefined)?.reason
       if (reason) ElMessage.warning(reasonText(reason))
@@ -272,33 +277,33 @@ onMounted(load)
 
       <el-divider content-position="left">工单用料（直接子件）</el-divider>
       <el-table :data="detail.materials" border size="small">
-        <el-table-column prop="sortNo" label="序" width="55" align="center" />
-        <el-table-column label="物料" min-width="170" show-overflow-tooltip>
+        <el-table-column prop="sortNo" label="序" width="50" align="center" />
+        <el-table-column label="物料" min-width="150" show-overflow-tooltip>
           <template #default="{ row }">
             {{ (row as WorkOrderMaterial).materialCode }} {{ (row as WorkOrderMaterial).materialName }}
             <span class="unit-hint">{{ (row as WorkOrderMaterial).unitName }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="baseQty" label="基准量" width="100" align="right" />
-        <el-table-column prop="componentQty" label="单位用量" width="105" align="right" />
-        <el-table-column prop="requiredQty" label="需求量" width="105" align="right" />
+        <el-table-column prop="baseQty" label="基准量" width="85" align="right" />
+        <el-table-column prop="componentQty" label="单位用量" width="90" align="right" />
+        <el-table-column prop="requiredQty" label="需求量" width="85" align="right" />
       </el-table>
 
       <el-divider content-position="left">工序与派工</el-divider>
       <el-table :data="detail.steps" border size="small">
-        <el-table-column prop="seq" label="序" width="55" align="center" />
-        <el-table-column label="工序" min-width="160">
+        <el-table-column prop="seq" label="序" width="50" align="center" />
+        <el-table-column label="工序" min-width="130">
           <template #default="{ row }">
             {{ (row as WorkOrderStep).processCode }} {{ (row as WorkOrderStep).processName }}
           </template>
         </el-table-column>
-        <el-table-column label="备注" min-width="120" show-overflow-tooltip>
+        <el-table-column label="备注" min-width="90" show-overflow-tooltip>
           <template #default="{ row }">{{ (row as WorkOrderStep).remark || '—' }}</template>
         </el-table-column>
-        <el-table-column label="当前派工" min-width="150" show-overflow-tooltip>
+        <el-table-column label="当前派工" min-width="110" show-overflow-tooltip>
           <template #default="{ row }">{{ currentAssignees(row as WorkOrderStep) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="90" fixed="right">
+        <el-table-column label="操作" width="70" fixed="right">
           <template #default="{ row }">
             <el-tooltip
               :disabled="(row as WorkOrderStep).canAssign"
@@ -400,9 +405,9 @@ onMounted(load)
 </template>
 
 <style scoped>
-.toolbar { display: flex; justify-content: space-between; align-items: center; }
-.actions-bar { display: flex; gap: 8px; }
-.title { font-weight: 600; }
+.toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+.actions-bar { display: flex; gap: 8px; flex-wrap: wrap; }
+.title { font-weight: 600; white-space: nowrap; }
 .unit-hint { margin-left: 4px; font-size: 12px; color: var(--el-text-color-secondary); }
 .event-line { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; font-size: 13px; }
 .event-status { color: var(--el-text-color-secondary); }

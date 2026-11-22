@@ -97,36 +97,40 @@ onMounted(() => { load(); loadProducts('') })
       </el-form>
     </template>
 
-    <el-table-column prop="workOrderNo" label="工单号" width="150" />
-    <el-table-column label="产品" min-width="150" show-overflow-tooltip>
+    <el-table-column label="工单号" width="130">
       <template #default="{ row }">
-        {{ (row as WorkOrderRow).productCode }} {{ (row as WorkOrderRow).productName }}
-        <span class="unit-hint">{{ (row as WorkOrderRow).unitName }}</span>
+        <div>{{ (row as WorkOrderRow).workOrderNo }}</div>
+        <div class="sub">{{ (row as WorkOrderRow).planNo ? `计划 ${(row as WorkOrderRow).planNo}` : '手工工单' }}</div>
       </template>
     </el-table-column>
-    <el-table-column prop="plannedQty" label="计划数量" width="105" align="right" />
-    <el-table-column label="计划开始" width="150">
-      <template #default="{ row }">{{ formatUtcShanghai((row as WorkOrderRow).plannedStartAt) }}</template>
-    </el-table-column>
-    <el-table-column label="计划结束" width="150">
-      <template #default="{ row }">{{ formatUtcShanghai((row as WorkOrderRow).plannedEndAt) }}</template>
-    </el-table-column>
-    <el-table-column label="状态" width="95">
+    <el-table-column label="状态" width="80">
       <template #default="{ row }">
         <el-tag size="small" :type="statusType((row as WorkOrderRow).status)">
           {{ WO_STATUS_LABEL[(row as WorkOrderRow).status] }}
         </el-tag>
       </template>
     </el-table-column>
-    <el-table-column label="工序进度" width="95" align="center">
+    <el-table-column label="产品" min-width="120" show-overflow-tooltip>
       <template #default="{ row }">
-        <span :class="{ muted: progressText(row as WorkOrderRow) === '待接入' }">{{ progressText(row as WorkOrderRow) }}</span>
+        {{ (row as WorkOrderRow).productCode }} {{ (row as WorkOrderRow).productName }}
+        <span class="unit-hint">{{ (row as WorkOrderRow).unitName }}</span>
       </template>
     </el-table-column>
-    <el-table-column label="来源计划" width="140">
-      <template #default="{ row }">{{ (row as WorkOrderRow).planNo || '—' }}</template>
+    <el-table-column label="数量" width="90" align="right">
+      <template #default="{ row }">
+        <div>{{ (row as WorkOrderRow).plannedQty }}</div>
+        <div class="sub" :class="{ muted: progressText(row as WorkOrderRow) === '待接入' }">
+          {{ progressText(row as WorkOrderRow) }}
+        </div>
+      </template>
     </el-table-column>
-    <el-table-column label="操作" width="80" fixed="right">
+    <el-table-column label="排期" width="115">
+      <template #default="{ row }">
+        <div class="time">{{ formatUtcShanghai((row as WorkOrderRow).plannedStartAt) }}</div>
+        <div class="sub">至 {{ formatUtcShanghai((row as WorkOrderRow).plannedEndAt) }}</div>
+      </template>
+    </el-table-column>
+    <el-table-column label="操作" width="65" fixed="right">
       <template #default="{ row }">
         <el-button link type="primary" @click="router.push(`/workorder/detail/${(row as WorkOrderRow).id}`)">详情</el-button>
       </template>
@@ -140,5 +144,7 @@ onMounted(() => { load(); loadProducts('') })
 .search :deep(.el-date-editor) { width: 160px; }
 .range-sep { margin: 0 6px; color: var(--el-text-color-secondary); }
 .unit-hint { margin-left: 4px; font-size: 12px; color: var(--el-text-color-secondary); }
+.sub { font-size: 12px; color: var(--el-text-color-secondary); margin-top: 2px; }
+.time { font-size: 13px; }
 .muted { color: var(--el-text-color-placeholder); }
 </style>
