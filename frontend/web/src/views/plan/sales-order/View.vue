@@ -39,7 +39,9 @@ const candidates = ref<OrderItemCandidate[]>([])
 const planForm = reactive({
   orderItemId: '', orderNo: '', productName: '', unitName: '',
   orderQty: '', scheduledQty: '', availableQty: '',
-  plannedQty: '', plannedStartAt: '', plannedEndAt: '', remark: null as string | null,
+  plannedQty: '', remark: null as string | null,
+  /** el-date-picker datetimerange 的 v-model，值为 [Date, Date]；提交时转 ISO UTC Z */
+  range: [] as Date[],
 })
 const planSubmitting = ref(false)
 
@@ -60,8 +62,7 @@ function fillPlanForm(c: OrderItemCandidate | null, item?: SalesOrderItem) {
   planForm.scheduledQty = c?.scheduledQty ?? item?.scheduledQty ?? ''
   planForm.availableQty = c?.availableQty ?? item?.availableQty ?? ''
   planForm.plannedQty = ''
-  planForm.plannedStartAt = ''
-  planForm.plannedEndAt = ''
+  planForm.range = []
   planForm.remark = null
 }
 
@@ -74,15 +75,22 @@ async function onCandidateChange(oid: string) {
   if (c) fillPlanForm(c)
 }
 
+/** Date → ISO 8601 UTC Z（后端 parse_utc 要求 …Z；去掉毫秒更干净） */
+function toUtcZ(d: Date): string {
+  return d.toISOString().replace(/\.\d{3}Z$/, 'Z')
+}
+
 async function submitPlan() {
   if (!planForm.orderItemId) { ElMessage.warning('请选择订单行'); return }
   if (!planForm.plannedQty || Number(planForm.plannedQty) <= 0) { ElMessage.warning('计划数量须大于 0'); return }
-  if (!planForm.plannedStartAt || !planForm.plannedEndAt) { ElMessage.warning('请选择起止时间'); return }
+  const [start, end] = planForm.range
+  if (!start || !end) { ElMessage.warning('请选择起止时间'); return }
+  if (end <= start) { ElMessage.warning('结束时间须晚于开始时间'); return }
   const payload: PlanCreatePayload = {
     orderItemId: planForm.orderItemId,
     plannedQty: planForm.plannedQty,
-    plannedStartAt: planForm.plannedStartAt,
-    plannedEndAt: planForm.plannedEndAt,
+    plannedStartAt: toUtcZ(start),
+    plannedEndAt: toUtcZ(end),
     remark: planForm.remark,
   }
   planSubmitting.value = true
@@ -138,21 +146,22 @@ onMounted(load)
       </el-descriptions>
 
       <el-divider content-position="left">订单明细</el-divider>
-      <el-table :data="detail.items" border size="small">
-        <el-table-column prop="lineNo" label="行号" width="70" align="center" />
-        <el-table-column label="产品">
+      <!-- 明细列较多（含数量三态+完成量+交期），单位并入产品单元格，窄屏横向滚动兜底，避免丢列 -->
+      <el-table :data="detail.items" border size="small" class="items-table">
+        <el-table-column prop="lineNo" label="行号" width="60" align="center" />
+        <el-table-column label="产品" min-width="170">
           <template #default="{ row }">
             <span>{{ (row as SalesOrderItem).productCode }} {{ (row as SalesOrderItem).productName }}</span>
             <el-tag v-if="(row as SalesOrderItem).productStatus === '1'" size="small" type="info" class="ml4">停用</el-tag>
+            <div class="unit-hint">{{ (row as SalesOrderItem).unitName }}</div>
           </template>
         </el-table-column>
-        <el-table-column prop="unitName" label="单位" width="80" />
-        <el-table-column prop="orderQty" label="订单数量" width="120" align="right" />
-        <el-table-column prop="scheduledQty" label="已排" width="110" align="right" />
-        <el-table-column prop="availableQty" label="可排" width="110" align="right" />
-        <el-table-column prop="completedQty" label="完成量" width="110" align="right" />
-        <el-table-column prop="dueDate" label="交期" width="120" />
-        <el-table-column label="操作" width="110" fixed="right">
+        <el-table-column prop="orderQty" label="订单数量" width="100" align="right" />
+        <el-table-column prop="scheduledQty" label="已排" width="95" align="right" />
+        <el-table-column prop="availableQty" label="可排" width="95" align="right" />
+        <el-table-column prop="completedQty" label="完成量" width="95" align="right" />
+        <el-table-column prop="dueDate" label="交期" width="105" />
+        <el-table-column label="操作" width="90">
           <template #default="{ row }">
             <el-tooltip
               v-if="auth.hasPerm(PERM.plan.salesOrder.create)"
@@ -193,8 +202,9 @@ onMounted(load)
         </el-form-item>
         <el-form-item label="计划起止">
           <el-date-picker
-            :model-value="[planForm.plannedStartAt, planForm.plannedEndAt]" type="datetimerange"
-            @change="(v: Date[] | null) => { planForm.plannedStartAt = v?.[0]?.toISOString() ?? ''; planForm.plannedEndAt = v?.[1]?.toISOString() ?? '' }"
+            v-model="planForm.range" type="datetimerange"
+            start-placeholder="开始时间" end-placeholder="结束时间"
+            style="width: 100%"
           />
         </el-form-item>
         <el-form-item label="备注">
@@ -214,4 +224,7 @@ onMounted(load)
 .title { font-weight: 600; }
 .ml4 { margin-left: 4px; }
 .qty-info { color: var(--el-text-color-regular); }
+/* 明细列多，窄屏允许横向滚动，保证已排/可排/完成量/交期不被挤掉 */
+.items-table { width: 100%; }
+.unit-hint { font-size: 12px; color: var(--el-text-color-secondary); }
 </style>

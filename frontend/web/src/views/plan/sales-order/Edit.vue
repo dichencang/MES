@@ -169,41 +169,43 @@ onMounted(() => { searchProduct(''); if (editing.value) loadDetail() })
       </el-form-item>
 
       <el-divider content-position="left">订单明细</el-divider>
-      <el-table :data="form.items" border size="small">
-        <el-table-column label="行号" width="80">
+      <!-- 窄容器下必须能一屏填完：行号/产品(含单位)/数量/交期/已排/操作，共 6 列，列宽压缩到 720px 内 -->
+      <el-table :data="form.items" border size="small" class="items-table">
+        <el-table-column label="行号" width="60" align="center">
           <template #default="{ row }">{{ (row as FormRow).lineNo }}</template>
         </el-table-column>
-        <el-table-column label="产品" min-width="240">
+        <el-table-column label="产品" min-width="180">
           <template #default="{ row }">
             <el-select
               v-model="(row as FormRow).productId"
               filterable remote :remote-method="searchProduct" :loading="productLoading"
-              placeholder="输入编码/名称搜索" @change="(v: string) => onProductChange(row as FormRow, v)"
+              placeholder="编码/名称搜索" @change="(v: string) => onProductChange(row as FormRow, v)"
             >
               <el-option
                 v-for="p in productOptions" :key="p.id" :value="p.id"
                 :label="`${p.code} ${p.name}`"
               />
             </el-select>
+            <span v-if="(row as FormRow).unitName" class="unit-hint">{{ (row as FormRow).unitName }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="单位" width="90">
-          <template #default="{ row }">{{ (row as FormRow).unitName ?? '—' }}</template>
-        </el-table-column>
-        <el-table-column label="订单数量" width="140">
+        <el-table-column label="订单数量" width="130">
           <template #default="{ row }">
             <el-input v-model="(row as FormRow).orderQty" placeholder="如 12.0000" />
           </template>
         </el-table-column>
-        <el-table-column label="交期" width="150">
+        <el-table-column label="交期" width="140">
           <template #default="{ row }">
-            <el-date-picker v-model="(row as FormRow).dueDate" type="date" value-format="YYYY-MM-DD" placeholder="交期" />
+            <el-date-picker
+              v-model="(row as FormRow).dueDate" type="date" value-format="YYYY-MM-DD"
+              placeholder="交期" style="width: 100%"
+            />
           </template>
         </el-table-column>
-        <el-table-column label="已排" width="110">
+        <el-table-column label="已排" width="100">
           <template #default="{ row }">{{ (row as FormRow).scheduledQty ?? '—' }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="80" fixed="right">
+        <el-table-column label="操作" width="70" align="center">
           <template #default="{ $index }">
             <el-button link type="danger" @click="removeRow($index as number)">删除</el-button>
           </template>
@@ -222,4 +224,12 @@ onMounted(() => { searchProduct(''); if (editing.value) loadDetail() })
 <style scoped>
 .title { font-weight: 600; }
 .add-row { margin-top: 12px; }
+/* 明细列较多，窄屏兜底允许横向滚动，避免关键列（数量/交期）被挤到视口外 */
+.items-table { width: 100%; }
+.unit-hint {
+  margin-left: 4px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+.items-table :deep(.el-date-editor) { width: 100%; }
 </style>
