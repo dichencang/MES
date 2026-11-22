@@ -11,6 +11,7 @@ from app.utils.responses import ApiError
 MODULE_NAMES = {
     "users": "用户管理", "roles": "角色管理", "permissions": "权限管理",
     "depts": "组织架构", "dict-types": "数据字典", "dict-data": "数据字典",
+    "workorders": "生产工单",
     "configs": "系统参数", "oper-logs": "操作日志", "auth": "认证",
     "materials": "物料档案", "processes": "工序档案", "boms": "产品 BOM", "routings": "工艺路线",
 }
@@ -57,6 +58,10 @@ async def write_log(db, request, status, error=None):
     }.get(path)
     if resource == "plan":
         action = {"cancel": "取消", "transfer": "转工单"}.get(path.rsplit("/", 1)[-1], action)
+    if resource == "workorders":
+        action = {"release": "下发", "start": "开工", "cancel": "撤销", "assignees": "派工"}.get(
+            path.rsplit("/", 1)[-1], action,
+        )
     if action is None:
         action = {"POST": "新增", "PUT": "修改", "DELETE": "删除"}[request.method] + module
     await db.execute(m.oper_log.insert().values(

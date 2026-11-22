@@ -22,7 +22,7 @@ async def api_error_handler(request: Request, error: ApiError):
 
 async def validation_error_handler(request: Request, error: RequestValidationError):
     def field_path(parts):
-        if request.scope["path"].split("/")[1] not in {"materials", "processes", "boms", "routings", "plan"}:
+        if request.scope["path"].split("/")[1] not in {"materials", "processes", "boms", "routings", "plan", "workorders"}:
             return ".".join(map(str, parts))
         path = ""
         for part in parts:

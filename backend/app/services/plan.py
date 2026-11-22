@@ -3,7 +3,10 @@ from decimal import Decimal
 
 from sqlalchemy import and_, case, func, literal, select
 
+from app.config.settings import settings
+
 from app.models import plan as model, system
+from app.models import basic, workorder
 from app.models.basic import material
 from app.services.basic import invalid
 from app.services.changes import commit, record
@@ -13,6 +16,7 @@ from app.utils.responses import ApiError
 ORDER = model.sales_order
 ITEM = model.sales_order_item
 PLAN = model.production_plan
+WORK_ORDER = workorder.work_order
 SHANGHAI = timezone(timedelta(hours=8))
 GANTT_MAX_DAYS = 92
 GANTT_MAX_PLANS = 2000
@@ -68,13 +72,13 @@ def check_dates(start, end):
         raise invalid("dateEnd", "结束日期不得早于开始日期")
 
 
-def time_window(statement, start, end):
+def time_window(statement, start, end, table=PLAN):
     check_dates(start, end)
     if start is not None:
-        statement = statement.where(PLAN.c.planned_end_at > datetime.combine(start, time.min, SHANGHAI))
+        statement = statement.where(table.c.planned_end_at > datetime.combine(start, time.min, SHANGHAI))
     if end is not None and end < date.max:
         statement = statement.where(
-            PLAN.c.planned_start_at < datetime.combine(end + timedelta(days=1), time.min, SHANGHAI),
+            table.c.planned_start_at < datetime.combine(end + timedelta(days=1), time.min, SHANGHAI),
         )
     return statement
 
@@ -94,8 +98,13 @@ def order_query():
         func.count().label("item_count"),
         func.count().filter(covered).label("scheduled_item_count"),
     ).outerjoin(occupied, occupied.c.order_item_id == ITEM.c.id).group_by(ITEM.c.order_id).subquery()
+    started = select(WORK_ORDER.c.id).join(PLAN, PLAN.c.id == WORK_ORDER.c.plan_id).join(
+        ITEM, ITEM.c.id == PLAN.c.order_item_id,
+    ).where(ITEM.c.order_id == ORDER.c.id, WORK_ORDER.c.started_at.is_not(None),
+            WORK_ORDER.c.status != "CANCELLED").exists()
     status = case(
         (ORDER.c.cancelled_at.is_not(None), "CANCELLED"),
+        (started, "IN_PRODUCTION"),
         (stats.c.item_count == stats.c.scheduled_item_count, "SCHEDULED"),
         else_="PENDING_SCHEDULING",
     )
@@ -186,28 +195,53 @@ async def candidates(db, order_no, product_id, only_available, page, size):
 
 def plan_query():
     unit = system.dict_data.alias("schedule_unit")
-    status = case((PLAN.c.cancelled_at.is_not(None), "CANCELLED"), else_="PENDING_TRANSFER")
+    status = case((PLAN.c.cancelled_at.is_not(None), "CANCELLED"),
+                  (WORK_ORDER.c.id.is_not(None), "TRANSFERRED"), else_="PENDING_TRANSFER")
     return select(
         PLAN, ORDER.c.order_no, ITEM.c.product_id, ITEM.c.product_code_snapshot.label("product_code"),
         ITEM.c.product_name_snapshot.label("product_name"), material.c.unit_code,
         unit.c.dict_label.label("unit_name"), status.label("status"),
+        WORK_ORDER.c.id.label("work_order_id"), WORK_ORDER.c.work_order_no,
+        WORK_ORDER.c.bom_id, WORK_ORDER.c.routing_id,
+        basic.bom.c.version.label("bom_version"), basic.routing.c.version.label("routing_version"),
     ).join(ITEM, ITEM.c.id == PLAN.c.order_item_id).join(ORDER, ORDER.c.id == ITEM.c.order_id).join(
         material, material.c.id == ITEM.c.product_id,
-    ).join(unit, and_(unit.c.dict_code == material.c.unit_dict_code, unit.c.dict_value == material.c.unit_code))
+    ).join(unit, and_(unit.c.dict_code == material.c.unit_dict_code, unit.c.dict_value == material.c.unit_code)
+    ).outerjoin(WORK_ORDER, and_(WORK_ORDER.c.plan_id == PLAN.c.id, WORK_ORDER.c.status != "CANCELLED")
+    ).outerjoin(basic.bom, basic.bom.c.id == WORK_ORDER.c.bom_id
+    ).outerjoin(basic.routing, basic.routing.c.id == WORK_ORDER.c.routing_id)
 
 
 def plan_payload(row):
-    return dict(serialize(row, PLAN_FIELDS), workOrderNo=None, bomVersion=None, routingVersion=None)
+    return dict(
+        serialize(row, PLAN_FIELDS), workOrderNo=row["work_order_no"],
+        bomVersion={"id": str(row["bom_id"]), "version": row["bom_version"]} if row["bom_id"] else None,
+        routingVersion={"id": str(row["routing_id"]), "version": row["routing_version"]} if row["routing_id"] else None,
+    )
 
 
 async def plan_detail(db, id):
     row = await one(db, plan_query().where(PLAN.c.id == id))
-    cancelled = "PLAN_CANCELLED" if row["cancelled_at"] else None
-    capability = actions(reschedule=cancelled, cancel=cancelled, transfer=cancelled)
-    capability["canTransfer"] = False
+    enabled = settings().work_order_transfer_enabled
+    blocked = ("PLAN_CANCELLED" if row["cancelled_at"] else
+               "PLAN_ALREADY_TRANSFERRED" if row["work_order_id"] else None)
+    transfer = blocked
+    if enabled and not blocked:
+        ready = await db.execute(select(
+            select(basic.bom.c.id).where(basic.bom.c.product_id == row["product_id"],
+                                        basic.bom.c.status == "1").exists(),
+            select(basic.routing.c.id).where(basic.routing.c.product_id == row["product_id"],
+                                            basic.routing.c.status == "1").exists(),
+        ))
+        if not all(ready.one()):
+            transfer = "MISSING_PRODUCTION_DEFINITION"
+    capability = actions(reschedule=blocked, cancel=blocked, transfer=transfer)
+    capability["canTransfer"] = enabled and capability["canTransfer"]
+    linked = ({"id": str(row["work_order_id"]), "workOrderNo": row["work_order_no"]}
+              if row["work_order_id"] else None)
     return dict(plan_payload(row), **serialize(
         row, "order_item_id product_code unit_code unit_name remark " + CANCELLATION,
-    ), actions=capability, features={"workOrderTransferEnabled": False}, workOrder=None)
+    ), actions=capability, features={"workOrderTransferEnabled": enabled}, workOrder=linked)
 
 
 async def list_plans(db, plan_no, order_no, product_id, status, start, end, page, size):
@@ -235,7 +269,7 @@ async def gantt(db, start, end, product_id):
         value["planId"] = value.pop("id")
         value["startAt"] = value.pop("plannedStartAt")
         value["endAt"] = value.pop("plannedEndAt")
-        result.append(dict(value, workOrderNo=None))
+        result.append(dict(value, workOrderNo=row["work_order_no"]))
     return result
 
 
@@ -359,6 +393,17 @@ async def lock_plan(db, id):
     return item, plan
 
 
+async def effective_work_order(db, plan_id):
+    return await db.scalar(select(WORK_ORDER.c.id).where(
+        WORK_ORDER.c.plan_id == plan_id, WORK_ORDER.c.status != "CANCELLED",
+    ))
+
+
+async def ensure_untransferred(db, id):
+    if await effective_work_order(db, id):
+        conflict("PLAN_ALREADY_TRANSFERRED")
+
+
 async def save_plan(db, actor, body, id=None):
     if body.planned_end_at <= body.planned_start_at:
         raise invalid("plannedEndAt", "结束时间必须晚于开始时间")
@@ -367,6 +412,7 @@ async def save_plan(db, actor, body, id=None):
         current = Decimal(0)
     else:
         item, plan = await lock_plan(db, id)
+        await ensure_untransferred(db, id)
         current = plan["planned_qty"]
     occupied = await db.scalar(select(func.coalesce(func.sum(PLAN.c.planned_qty), 0)).where(
         PLAN.c.order_item_id == item["id"], PLAN.c.cancelled_at.is_(None),
@@ -394,12 +440,25 @@ async def save_plan(db, actor, body, id=None):
 
 async def cancel_plan(db, actor, id, body):
     await lock_plan(db, id)
+    await ensure_untransferred(db, id)
     await mark_cancelled(db, PLAN, id, actor, body)
     return await plan_detail(db, id)
 
 
-async def transfer_plan(db, id):
-    await record(db, PLAN, id)
-    raise ApiError(409, 4100, "工单转单功能尚未启用", {
-        "reason": {"code": "WORK_ORDER_TRANSFER_DISABLED", "message": "工单转单功能尚未启用"},
-    })
+async def transfer_plan(db, id, actor):
+    from app.services.workorder import create
+
+    if not settings().work_order_transfer_enabled:
+        await record(db, PLAN, id)
+        message = "工单转单功能尚未启用"
+        raise ApiError(409, 4100, message, {
+            "reason": {"code": "WORK_ORDER_TRANSFER_DISABLED", "message": message},
+        })
+    item, schedule = await lock_plan(db, id)
+    if not await effective_work_order(db, id):
+        fields = {key: schedule[key] for key in (
+            "planned_qty", "planned_start_at", "planned_end_at", "remark",
+        )}
+        await create(db, actor, item["product_id"], fields, plan_id=id)
+    await commit(db)
+    return await plan_detail(db, id)

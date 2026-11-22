@@ -6,6 +6,7 @@ from app.models import system as m
 from app.models.basic_seed import seed_statements
 from app.models.plan_seed import permission_statements, seed_sample
 from app.models.seed_data import BUSINESS_MODULES, PERMISSIONS
+from app.models import workorder_seed
 from app.utils.passwords import hash_password
 
 DICTIONARIES = {
@@ -38,7 +39,7 @@ async def seed_business_permissions(connection):
             module, perm_name=directory, perm_type="DIR",
             path=path, icon=icon, order_num=order,
         )
-    for statement in (*seed_statements(), *permission_statements()):
+    for statement in (*seed_statements(), *permission_statements(), *workorder_seed.permission_statements()):
         await connection.execute(statement)
 
 
@@ -46,6 +47,7 @@ async def seed_system(connection):
     if await connection.scalar(select(m.user.c.id).where(m.user.c.username == "admin")):
         await seed_business_permissions(connection)
         await seed_sample(connection)
+        await workorder_seed.seed_sample(connection)
         return
     await connection.execute(m.dept.insert().values(id=1, dept_name="总部", order_num=1))
     await connection.execute(m.role.insert().values(
@@ -81,3 +83,4 @@ async def seed_system(connection):
         ))
     await seed_business_permissions(connection)
     await seed_sample(connection)
+    await workorder_seed.seed_sample(connection)

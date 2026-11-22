@@ -15,6 +15,7 @@ from app.routers.changes import router as changes_router
 from app.routers.management import router as management_router
 from app.routers.plan import router as plan_router
 from app.routers.system import router as system_router
+from app.routers.workorder import router as workorder_router
 from app.services.auth import secret
 from app.utils.responses import ApiError, api_error_handler, validation_error_handler
 
@@ -57,3 +58,4 @@ app.include_router(management_router)
 app.include_router(changes_router)
 app.include_router(basic_router)
 app.include_router(plan_router)
+app.include_router(workorder_router)

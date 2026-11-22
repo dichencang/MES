@@ -87,8 +87,8 @@ async def cancel_plan(id: Id, body: dto.Cancel, db: Db, account: Account):
 
 
 @router.post("/production-plans/{id}/transfer", dependencies=[permission("production-plan:transfer")])
-async def transfer_plan(id: Id, db: Db):
-    return success(await service.transfer_plan(db, int(id)))
+async def transfer_plan(id: Id, db: Db, account: Account):
+    return success(await service.transfer_plan(db, int(id), account["id"]))
 
 
 @router.get("/gantt", dependencies=[permission("gantt:list")])
