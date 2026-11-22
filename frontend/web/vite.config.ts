@@ -2,13 +2,13 @@ import { fileURLToPath, URL } from 'node:url'
 
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
-import vueDevTools from 'vite-plugin-vue-devtools'
 
 // https://vite.dev/config/
 export default defineConfig({
+  // 不挂 vite-plugin-vue-devtools：它会在页面左下角注入浮标，浏览器走查时易误点弹出大面板遮挡页面。
+  // 需要调试时用浏览器原生开发者工具，不再注入该浮标。
   plugins: [
     vue(),
-    vueDevTools(),
   ],
   resolve: {
     alias: {
