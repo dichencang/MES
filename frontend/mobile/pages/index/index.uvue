@@ -33,7 +33,23 @@ const stats = [
 
 // 工作台功能入口目录（需求真源分组）
 type WorkItem = { key: string; name: string }
-const workGroups: Array<{ key: string; title: string; items: WorkItem[] }> = [
+type WorkGroup = { key: string; title: string; items: WorkItem[] }
+
+// 已落地业务入口所需权限：无权限则不展示入口（页面内另有 403 兜底）；空串表示非已落地模块
+function entryPerm(key: string): string {
+  if (key === 'so') return 'plan:sales-order:list'
+  if (key === 'plan') return 'plan:production-plan:list'
+  return ''
+}
+
+function hasPerm(code: string): boolean {
+  const user = profileStore.getUser()
+  if (user && user.isSuper) return true
+  const perm = profileStore.getPermissions()
+  return perm ? perm.permissionCodes.indexOf(code) >= 0 : false
+}
+
+const workGroups: WorkGroup[] = [
   {
     key: 'plan',
     title: '计划管理',
@@ -72,6 +88,20 @@ const workGroups: Array<{ key: string; title: string; items: WorkItem[] }> = [
     ],
   },
 ]
+
+// 按权限过滤入口：已落地业务无权限则不展示；未落地模块保留占位
+const visibleGroups = computed(() => {
+  const out: WorkGroup[] = []
+  for (const g of workGroups) {
+    const items: WorkItem[] = []
+    for (const it of g.items) {
+      const need = entryPerm(it.key)
+      if (need === '' || hasPerm(need)) items.push(it)
+    }
+    if (items.length > 0) out.push({ key: g.key, title: g.title, items })
+  }
+  return out
+})
 
 const currentTabName = computed(() => {
   const t = tabs.find((x) => x.key === activeTab.value)
@@ -212,7 +242,7 @@ onReady(() => {
 
       <!-- ===== 工作台：功能入口目录（横向网格，短名称竖排浪费空间） ===== -->
       <view v-if="activeTab === 'workbench'" class="pane">
-        <view v-for="g in workGroups" :key="g.key" class="group">
+        <view v-for="g in visibleGroups" :key="g.key" class="group">
           <text class="group-title">{{ g.title }}</text>
           <view class="group-grid">
             <view v-for="it in g.items" :key="it.key" class="group-col">

@@ -25,6 +25,7 @@ const auth = useAuthStore()
 const loading = ref(true)
 const detail = ref<ProductionPlanDetail | null>(null)
 const transferring = ref(false)
+const canceling = ref(false)
 const id = computed(() => String(route.params.id))
 
 async function load() {
@@ -68,6 +69,7 @@ async function doCancel() {
         inputValidator: (v: string) => (v?.trim() ? true : '取消说明不能为空'),
       },
     )
+    canceling.value = true
     await cancelProductionPlan(id.value, { cancelReason: value.trim() })
     ElMessage.success('计划已取消')
     await load()
@@ -78,9 +80,10 @@ async function doCancel() {
       const r = asStateConflict(e.data)
       await ElMessageBox.alert(reasonText(r), '无法取消', { type: 'warning' })
     }
+  } finally {
+    canceling.value = false
   }
 }
-
 onMounted(load)
 </script>
 
@@ -89,19 +92,32 @@ onMounted(load)
     <template #header>
       <div class="toolbar">
         <span class="title">生产计划详情</span>
-        <div>
-          <el-button
-            v-if="auth.hasPerm(PERM.plan.productionPlan.update) && detail?.actions.canReschedule"
-            @click="router.push(`/plan/production-plan/edit/${id}`)"
-          >编辑排期</el-button>
-          <el-button
-            v-if="auth.hasPerm(PERM.plan.productionPlan.cancel) && detail?.actions.canCancel"
-            type="danger" @click="doCancel"
-          >取消</el-button>
+        <div class="actions-bar">
+          <el-tooltip
+            v-if="auth.hasPerm(PERM.plan.productionPlan.update)"
+            :disabled="detail?.actions.canReschedule !== false"
+            :content="reasonText(detail?.actions.disableReasons.reschedule)"
+          >
+            <span>
+              <el-button
+                :disabled="!detail?.actions.canReschedule"
+                @click="router.push(`/plan/production-plan/edit/${id}`)"
+              >编辑排期</el-button>
+            </span>
+          </el-tooltip>
+          <el-tooltip
+            v-if="auth.hasPerm(PERM.plan.productionPlan.cancel)"
+            :disabled="detail?.actions.canCancel !== false"
+            :content="reasonText(detail?.actions.disableReasons.cancel)"
+          >
+            <span>
+              <el-button :disabled="!detail?.actions.canCancel" type="danger" :loading="canceling" @click="doCancel">取消</el-button>
+            </span>
+          </el-tooltip>
           <el-tooltip
             v-if="auth.hasPerm(PERM.plan.productionPlan.transfer) && detail?.features.workOrderTransferEnabled"
-            :disabled="detail.actions.canTransfer"
-            :content="detail ? reasonText(detail.actions.disableReasons.transfer) : ''"
+            :disabled="detail?.actions.canTransfer !== false"
+            :content="reasonText(detail?.actions.disableReasons.transfer)"
           >
             <span>
               <el-button
@@ -145,6 +161,7 @@ onMounted(load)
 
 <style scoped>
 .toolbar { display: flex; justify-content: space-between; align-items: center; }
+.actions-bar { display: flex; gap: 8px; }
 .title { font-weight: 600; }
 .workorder { display: flex; align-items: center; gap: 12px; }
 </style>

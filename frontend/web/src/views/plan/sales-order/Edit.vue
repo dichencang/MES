@@ -205,7 +205,7 @@ onMounted(() => { searchProduct(''); if (editing.value) loadDetail() })
         <el-table-column label="已排" width="100">
           <template #default="{ row }">{{ (row as FormRow).scheduledQty ?? '—' }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="70" align="center">
+        <el-table-column label="操作" width="70" align="center" fixed="right">
           <template #default="{ $index }">
             <el-button link type="danger" @click="removeRow($index as number)">删除</el-button>
           </template>

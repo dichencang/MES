@@ -1,11 +1,11 @@
 <script setup lang="ts">
 // 销售订单详情（契约-计划管理 §2.2）。展示逐行数量与能力；从行创建计划（拆分入口一）。
-//  · 权限控制显隐；actions.canCreatePlan 控制置灰 + disableReason 原因
+//  · 权限控显隐（auth.hasPerm）；业务能力控置灰（actions.canEdit/canCancel/canCreatePlan）+ disableReasons 原因
 //  · 创建计划弹窗展示订单数量/已排/可排，提交由后端校验最新余额（超额 409 时刷新该行）
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import { getSalesOrder, listOrderItems, createProductionPlan } from '@/api'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { getSalesOrder, listOrderItems, createProductionPlan, cancelSalesOrder } from '@/api'
 import { ApiError } from '@/api/request'
 import { PLAN_BIZ_CODE } from '@/constants/biz'
 import { PERM } from '@/constants/perm'
@@ -30,6 +30,35 @@ async function load() {
     detail.value = await getSalesOrder(id.value)
   } finally {
     loading.value = false
+  }
+}
+
+// ── 取消订单 ─────────────────────────────────────────
+const canceling = ref(false)
+
+async function cancelOrder() {
+  if (!detail.value) return
+  try {
+    const { value } = await ElMessageBox.prompt(
+      `确认取消订单「${detail.value.orderNo}」？请填写取消说明。`,
+      '取消订单',
+      {
+        inputType: 'textarea', inputPlaceholder: '请输入取消原因（必填）',
+        confirmButtonText: '确认取消', cancelButtonText: '返回',
+        inputValidator: (v: string) => (v?.trim() ? true : '取消说明不能为空'),
+      },
+    )
+    canceling.value = true
+    await cancelSalesOrder(detail.value.id, { cancelReason: value.trim() })
+    ElMessage.success('订单已取消')
+    await load()
+  } catch (e) {
+    if (e === 'cancel' || e === 'close') return
+    // 409 + 4100：后端 message 已由请求层提示，这里只刷新最新能力状态
+    if (e instanceof ApiError && e.code === 4100) { await load(); return }
+    throw e
+  } finally {
+    canceling.value = false
   }
 }
 
@@ -123,18 +152,43 @@ onMounted(load)
     <template #header>
       <div class="toolbar">
         <span class="title">销售订单详情</span>
-        <div>
-          <el-button v-if="auth.hasPerm(PERM.plan.salesOrder.update) && detail?.actions.canEdit" @click="router.push(`/plan/sales-order/edit/${id}`)">编辑</el-button>
-          <el-button
-            v-if="auth.hasPerm(PERM.plan.salesOrder.create) && detail?.actions.canCreatePlan"
-            type="primary" @click="openCreatePlan()"
-          >创建计划</el-button>
+        <div class="actions-bar">
+          <el-tooltip
+            v-if="auth.hasPerm(PERM.plan.salesOrder.update)"
+            :disabled="detail?.actions.canEdit !== false"
+            :content="reasonText(detail?.actions.disableReasons.edit)"
+          >
+            <span>
+              <el-button
+                :disabled="!detail?.actions.canEdit"
+                @click="router.push(`/plan/sales-order/edit/${id}`)"
+              >编辑</el-button>
+            </span>
+          </el-tooltip>
+          <el-tooltip
+            v-if="auth.hasPerm(PERM.plan.salesOrder.create)"
+            :disabled="detail?.actions.canCreatePlan !== false"
+            :content="reasonText(detail?.actions.disableReasons.createPlan)"
+          >
+            <span>
+              <el-button :disabled="!detail?.actions.canCreatePlan" type="primary" @click="openCreatePlan()">创建计划</el-button>
+            </span>
+          </el-tooltip>
+          <el-tooltip
+            v-if="auth.hasPerm(PERM.plan.salesOrder.cancel)"
+            :disabled="detail?.actions.canCancel !== false"
+            :content="reasonText(detail?.actions.disableReasons.cancel)"
+          >
+            <span>
+              <el-button :disabled="!detail?.actions.canCancel" type="danger" :loading="canceling" @click="cancelOrder()">取消</el-button>
+            </span>
+          </el-tooltip>
         </div>
       </div>
     </template>
 
     <template v-if="detail">
-      <el-descriptions :column="3" border>
+      <el-descriptions :column="2" border size="small">
         <el-descriptions-item label="订单号">{{ detail.orderNo }}</el-descriptions-item>
         <el-descriptions-item label="客户">{{ detail.customerName }}</el-descriptions-item>
         <el-descriptions-item label="订单日期">{{ detail.orderDate }}</el-descriptions-item>
@@ -142,7 +196,7 @@ onMounted(load)
           <el-tag size="small">{{ SALES_ORDER_STATUS_LABEL[detail.status] }}</el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="备注" :span="2">{{ detail.remark || '—' }}</el-descriptions-item>
-        <el-descriptions-item v-if="detail.cancelledAt" label="取消原因" :span="3">{{ detail.cancelReason }}</el-descriptions-item>
+        <el-descriptions-item v-if="detail.cancelledAt" label="取消原因" :span="2">{{ detail.cancelReason }}</el-descriptions-item>
       </el-descriptions>
 
       <el-divider content-position="left">订单明细</el-divider>
@@ -161,7 +215,7 @@ onMounted(load)
         <el-table-column prop="availableQty" label="可排" width="95" align="right" />
         <el-table-column prop="completedQty" label="完成量" width="95" align="right" />
         <el-table-column prop="dueDate" label="交期" width="105" />
-        <el-table-column label="操作" width="90">
+        <el-table-column label="操作" width="90" fixed="right">
           <template #default="{ row }">
             <el-tooltip
               v-if="auth.hasPerm(PERM.plan.salesOrder.create)"
@@ -221,6 +275,7 @@ onMounted(load)
 
 <style scoped>
 .toolbar { display: flex; justify-content: space-between; align-items: center; }
+.actions-bar { display: flex; gap: 8px; }
 .title { font-weight: 600; }
 .ml4 { margin-left: 4px; }
 .qty-info { color: var(--el-text-color-regular); }

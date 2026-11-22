@@ -4,8 +4,8 @@ import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import PageTable from '@/components/common/PageTable.vue'
 import { useCrud } from '@/composables/useCrud'
-import { listProductionPlans } from '@/api'
-import { PLAN_STATUS_LABEL, type ProductionPlanRow, type ProductionPlanStatus } from '@/types'
+import { listProductionPlans, materialOptions } from '@/api'
+import { PLAN_STATUS_LABEL, type ProductionPlanRow, type ProductionPlanStatus, type MaterialOption } from '@/types'
 import { formatUtcShanghai } from '@/utils/time'
 
 const router = useRouter()
@@ -13,6 +13,14 @@ const { loading, rows, total, query, load, search, resetQuery } = useCrud<Produc
   fetch: listProductionPlans,
   defaultQuery: () => ({ planNo: '', orderNo: '', productId: '', status: '', dateStart: '', dateEnd: '' }),
 })
+
+// 产品下拉：复用会话级产品选项，不需要基础数据管理权限
+const productOptions = ref<MaterialOption[]>([])
+async function loadProducts(kw: string) {
+  const res = await materialOptions({ keyword: kw || undefined, isProduct: true, pageSize: 20 })
+  productOptions.value = res.list
+}
+onMounted(() => { loadProducts('') })
 
 const statusOptions = Object.entries(PLAN_STATUS_LABEL).map(([value, label]) => ({ value, label }))
 
@@ -44,7 +52,12 @@ onMounted(load)
           <el-input v-model="query.orderNo" placeholder="模糊" clearable @keyup.enter="search" />
         </el-form-item>
         <el-form-item label="产品">
-          <el-input v-model="query.productId" placeholder="产品 ID" clearable @keyup.enter="search" />
+          <el-select
+            v-model="query.productId" filterable remote clearable
+            :remote-method="loadProducts" placeholder="全部产品"
+          >
+            <el-option v-for="p in productOptions" :key="p.id" :value="p.id" :label="`${p.code} ${p.name}`" />
+          </el-select>
         </el-form-item>
         <el-form-item label="状态">
           <el-select v-model="query.status" placeholder="全部" clearable>
@@ -52,10 +65,15 @@ onMounted(load)
           </el-select>
         </el-form-item>
         <el-form-item label="计划时间">
+          <!-- 契约 §3.5：与甘特图同一重叠口径，起止可分别省略任一端 -->
           <el-date-picker
-            :model-value="[query.dateStart, query.dateEnd]" type="daterange" value-format="YYYY-MM-DD"
-            start-placeholder="开始" end-placeholder="结束"
-            @change="(v: string[] | null) => { query.dateStart = v?.[0] ?? ''; query.dateEnd = v?.[1] ?? '' }"
+            v-model="query.dateStart" type="date" value-format="YYYY-MM-DD"
+            placeholder="开始（可空）"
+          />
+          <span class="range-sep">~</span>
+          <el-date-picker
+            v-model="query.dateEnd" type="date" value-format="YYYY-MM-DD"
+            placeholder="结束（可空）"
           />
         </el-form-item>
         <el-form-item>
@@ -97,4 +115,5 @@ onMounted(load)
 .search :deep(.el-input),
 .search :deep(.el-select),
 .search :deep(.el-date-editor) { width: 170px; }
+.range-sep { margin: 0 6px; color: var(--el-text-color-secondary); }
 </style>
