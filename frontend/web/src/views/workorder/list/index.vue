@@ -36,6 +36,7 @@ function progressText(row: WorkOrderRow): string {
   return `${row.finishedStepCount}/${row.stepCount}`
 }
 
+
 // 产品下拉：复用会话级产品选项，不需要基础数据管理权限
 const productOptions = ref<MaterialOption[]>([])
 async function loadProducts(kw: string) {
@@ -97,26 +98,26 @@ onMounted(() => { load(); loadProducts('') })
       </el-form>
     </template>
 
-    <el-table-column label="工单号" width="130">
+    <el-table-column label="工单号" width="118">
       <template #default="{ row }">
         <div>{{ (row as WorkOrderRow).workOrderNo }}</div>
         <div class="sub">{{ (row as WorkOrderRow).planNo ? `计划 ${(row as WorkOrderRow).planNo}` : '手工工单' }}</div>
       </template>
     </el-table-column>
-    <el-table-column label="状态" width="80">
+    <el-table-column label="状态" width="76">
       <template #default="{ row }">
         <el-tag size="small" :type="statusType((row as WorkOrderRow).status)">
           {{ WO_STATUS_LABEL[(row as WorkOrderRow).status] }}
         </el-tag>
       </template>
     </el-table-column>
-    <el-table-column label="产品" min-width="120" show-overflow-tooltip>
+    <el-table-column label="产品" min-width="100" show-overflow-tooltip>
       <template #default="{ row }">
         {{ (row as WorkOrderRow).productCode }} {{ (row as WorkOrderRow).productName }}
         <span class="unit-hint">{{ (row as WorkOrderRow).unitName }}</span>
       </template>
     </el-table-column>
-    <el-table-column label="数量" width="90" align="right">
+    <el-table-column label="数量 / 工序" width="103" align="right">
       <template #default="{ row }">
         <div>{{ (row as WorkOrderRow).plannedQty }}</div>
         <div class="sub" :class="{ muted: progressText(row as WorkOrderRow) === '待接入' }">
