@@ -38,6 +38,9 @@ const rules: FormRules = {
 
 const productLoading = ref(false)
 const productOptions = ref<MaterialOption[]>([])
+/** 存在有效计划（任一行已排 > 0）时业务已定稿：仅备注可改，其余字段与明细冻结 */
+const hasActivePlans = ref(false)
+const frozen = computed(() => editing.value && hasActivePlans.value)
 
 async function searchProduct(keyword: string) {
   productLoading.value = true
@@ -85,6 +88,8 @@ async function loadDetail() {
     dueDate: it.dueDate,
     scheduledQty: it.scheduledQty,
   }))
+  // 有有效计划的订单：仅允许改备注（契约 §七 业务规则，后端按字段逐项校验）
+  hasActivePlans.value = d.items.some((it) => Number(it.scheduledQty) > 0)
   // 回显产品加入候选，避免远程搜索里没有历史项
   productOptions.value = d.items.map((it) => ({
     id: it.productId, code: it.productCode, name: it.productName, spec: null,
@@ -152,15 +157,27 @@ onMounted(() => { searchProduct(''); if (editing.value) loadDetail() })
     <template #header><span class="title">{{ editing ? '编辑销售订单' : '新建销售订单' }}</span></template>
 
     <el-form ref="formRef" :model="form" :rules="rules" label-width="90px">
+      <el-alert
+        v-if="frozen"
+        class="mb"
+        type="warning"
+        :closable="false"
+        show-icon
+        title="该订单存在有效计划：仅可修改备注，客户、订单日期、明细分品与数量交期均已冻结"
+        description="如需调整数量或交期，请先取消关联的生产计划。"
+      />
       <el-row :gutter="16">
         <el-col :span="8">
           <el-form-item label="客户名称" prop="customerName">
-            <el-input v-model="form.customerName" maxlength="100" />
+            <el-input v-model="form.customerName" maxlength="100" :disabled="frozen" />
           </el-form-item>
         </el-col>
         <el-col :span="8">
           <el-form-item label="订单日期" prop="orderDate">
-            <el-date-picker v-model="form.orderDate" type="date" value-format="YYYY-MM-DD" placeholder="选择日期" />
+            <el-date-picker
+              v-model="form.orderDate" type="date" value-format="YYYY-MM-DD"
+              placeholder="选择日期" :disabled="frozen"
+            />
           </el-form-item>
         </el-col>
       </el-row>
@@ -179,7 +196,8 @@ onMounted(() => { searchProduct(''); if (editing.value) loadDetail() })
             <el-select
               v-model="(row as FormRow).productId"
               filterable remote :remote-method="searchProduct" :loading="productLoading"
-              placeholder="编码/名称搜索" @change="(v: string) => onProductChange(row as FormRow, v)"
+              placeholder="编码/名称搜索" :disabled="frozen"
+              @change="(v: string) => onProductChange(row as FormRow, v)"
             >
               <el-option
                 v-for="p in productOptions" :key="p.id" :value="p.id"
@@ -191,14 +209,14 @@ onMounted(() => { searchProduct(''); if (editing.value) loadDetail() })
         </el-table-column>
         <el-table-column label="订单数量" width="130">
           <template #default="{ row }">
-            <el-input v-model="(row as FormRow).orderQty" placeholder="如 12.0000" />
+            <el-input v-model="(row as FormRow).orderQty" placeholder="如 12.0000" :disabled="frozen" />
           </template>
         </el-table-column>
         <el-table-column label="交期" width="140">
           <template #default="{ row }">
             <el-date-picker
               v-model="(row as FormRow).dueDate" type="date" value-format="YYYY-MM-DD"
-              placeholder="交期" style="width: 100%"
+              placeholder="交期" style="width: 100%" :disabled="frozen"
             />
           </template>
         </el-table-column>
@@ -207,11 +225,11 @@ onMounted(() => { searchProduct(''); if (editing.value) loadDetail() })
         </el-table-column>
         <el-table-column label="操作" width="70" align="center" fixed="right">
           <template #default="{ $index }">
-            <el-button link type="danger" @click="removeRow($index as number)">删除</el-button>
+            <el-button link type="danger" :disabled="frozen" @click="removeRow($index as number)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
-      <el-button class="add-row" @click="addRow">+ 添加明细行</el-button>
+      <el-button class="add-row" :disabled="frozen" @click="addRow">+ 添加明细行</el-button>
     </el-form>
 
     <template #footer>
@@ -223,6 +241,7 @@ onMounted(() => { searchProduct(''); if (editing.value) loadDetail() })
 
 <style scoped>
 .title { font-weight: 600; }
+.mb { margin-bottom: 12px; }
 .add-row { margin-top: 12px; }
 /* 明细列较多，窄屏兜底允许横向滚动，避免关键列（数量/交期）被挤到视口外 */
 .items-table { width: 100%; }

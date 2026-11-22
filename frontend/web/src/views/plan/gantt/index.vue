@@ -17,9 +17,17 @@ const productOptions = ref<MaterialOption[]>([])
 const errors = ref<string[]>([])
 
 const DAY = 24 * 3600 * 1000
+// 契约 §4.3（v1.1）：单次查询最多 92 个自然日（含首尾），最多 2000 条；超限后端 400+1001
+const MAX_DAYS = 92
+
 function today() { return new Date().toISOString().slice(0, 10) }
 function shift(dateStr: string, days: number): string {
   return new Date(new Date(dateStr + 'T00:00:00Z').getTime() + days * DAY).toISOString().slice(0, 10)
+}
+/** 含首尾的自然日跨度 */
+function spanDays(start: string, end: string): number {
+  if (!start || !end) return 0
+  return Math.floor((new Date(end + 'T00:00:00Z').getTime() - new Date(start + 'T00:00:00Z').getTime()) / DAY) + 1
 }
 
 const query = reactive({
@@ -32,14 +40,16 @@ const days = computed<string[]>(() => {
   const out: string[] = []
   let cur = query.dateStart
   // 上限 92 天，防止误选超长区间撑爆 DOM
-  for (let i = 0; i < 92 && cur <= query.dateEnd; i++) {
+  for (let i = 0; i < MAX_DAYS && cur <= query.dateEnd; i++) {
     out.push(cur)
     cur = shift(cur, 1)
   }
   return out
 })
 
-const truncated = computed(() => days.value.length >= 92 && shift(days.value[91] ?? query.dateStart, 1) <= query.dateEnd)
+const truncated = computed(() => days.value.length >= MAX_DAYS && shift(days.value[MAX_DAYS - 1] ?? query.dateStart, 1) <= query.dateEnd)
+/** 当前选择是否超过 92 天（超限不发请求，直接提示） */
+const spanTooLong = computed(() => spanDays(query.dateStart, query.dateEnd) > MAX_DAYS)
 
 function ratio(dateStr: string): number {
   // UTC Z → 上海日期，再落到区间刻度
@@ -60,6 +70,16 @@ function barStyle(p: GanttPlan) {
 
 async function load() {
   errors.value = []
+  if (!query.dateStart || !query.dateEnd) {
+    errors.value = ['请选择开始日和结束日']
+    return
+  }
+  if (spanTooLong.value) {
+    const msg = `单次查询最多包含 ${MAX_DAYS} 个自然日（当前 ${spanDays(query.dateStart, query.dateEnd)} 天），请缩短日期范围`
+    errors.value = [msg]
+    ElMessage.error(msg)
+    return
+  }
   loading.value = true
   try {
     const params: Record<string, unknown> = { dateStart: query.dateStart, dateEnd: query.dateEnd }
@@ -67,8 +87,10 @@ async function load() {
     plans.value = await listGantt(params)
   } catch (e) {
     if (e instanceof ApiError && e.code === 1001) {
-      errors.value = [ganttDateError(e.data)]
-      ElMessage.error(ganttDateError(e.data))
+      // 含条数超 2000 的拒绝：后端在 data.errors 的 dateEnd 字段给出提示
+      const msg = ganttDateError(e.data)
+      errors.value = [msg]
+      ElMessage.error(msg)
     }
     plans.value = []
   } finally {
@@ -102,6 +124,7 @@ onMounted(() => { load(); loadProducts('') })
       </el-form-item>
       <el-form-item>
         <el-button type="primary" @click="load">查询</el-button>
+        <span class="limit-hint">单次最多 92 天、2000 条（当前 {{ spanDays(query.dateStart, query.dateEnd) }} 天）</span>
       </el-form-item>
     </el-form>
 
@@ -141,6 +164,7 @@ onMounted(() => { load(); loadProducts('') })
 .title { font-weight: 600; }
 .search :deep(.el-date-editor), .search :deep(.el-select) { width: 180px; }
 .mb { margin-bottom: 12px; }
+.limit-hint { margin-left: 10px; font-size: 12px; color: var(--el-text-color-secondary); }
 .hints { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
 .warn { color: var(--el-color-warning); font-size: 12px; }
 .gantt { border: 1px solid var(--el-border-color); border-radius: 4px; overflow-x: auto; }
