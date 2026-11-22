@@ -120,7 +120,16 @@ function onTabChange(name: string): void {
   activeTab.value = name
 }
 
-function openPage(name: string): void {
+// 工作台入口：计划管理两项已落地（只读），按 key 跳真实页面；其余模块待开发。
+function openPage(name: string, key: string): void {
+  if (key === 'so') {
+    uni.navigateTo({ url: '/pages/plan/sales-order-list' })
+    return
+  }
+  if (key === 'plan') {
+    uni.navigateTo({ url: '/pages/plan/production-plan-list' })
+    return
+  }
   uni.showToast({ title: name + '：模块待开发', icon: 'none' })
 }
 
@@ -207,7 +216,7 @@ onReady(() => {
           <text class="group-title">{{ g.title }}</text>
           <view class="group-grid">
             <view v-for="it in g.items" :key="it.key" class="group-col">
-              <view class="group-cell" @click="openPage(it.name)">
+              <view class="group-cell" @click="openPage(it.name, it.key)">
                 <text class="group-cell-text">{{ it.name }}</text>
               </view>
             </view>

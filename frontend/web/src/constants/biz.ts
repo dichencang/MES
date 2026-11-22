@@ -22,6 +22,14 @@ export const BIZ_CODE = {
 
 export type BizCode = (typeof BIZ_CODE)[keyof typeof BIZ_CODE]
 
+/** 计划管理专用字符串业务码（HTTP 409，契约-计划管理 §5.1）。与数字码分开，避免混淆 */
+export const PLAN_BIZ_CODE = {
+  MISSING_PRODUCTION_DEFINITION: 'MISSING_PRODUCTION_DEFINITION',
+  PLAN_QUANTITY_EXCEEDS_AVAILABLE: 'PLAN_QUANTITY_EXCEEDS_AVAILABLE',
+  /** 其余状态冲突：HTTP 409 + 数字码 + data.reason */
+  STATE_CONFLICT: 4100,
+} as const
+
 /** 前端本地错误码：网络异常 / 超时时使用，不与后端码冲突 */
 export const LOCAL_CODE = {
   NETWORK: -1,

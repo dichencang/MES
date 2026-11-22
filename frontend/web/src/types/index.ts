@@ -2,9 +2,11 @@
 // 基础数据类型在 ./basic.ts，此处统一再导出，方便 `import type { Material } from '@/types'`。
 
 export * from './basic'
+export * from './plan'
 
 export interface ApiResult<T> {
-  code: number
+  /** 成功/通用错误为数字码；部分业务冲突为字符串码（契约-计划管理 §5.1） */
+  code: number | string
   message: string
   data: T
 }

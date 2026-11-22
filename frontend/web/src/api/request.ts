@@ -14,11 +14,12 @@ const BASE = import.meta.env.VITE_API_BASE || '/api/v1'
 
 /** 统一业务错误：页面拿 code 分流，拿 message 展示 */
 export class ApiError extends Error {
-  code: number
+  /** 成功/通用错误为数字码；计划管理两项业务冲突为字符串码（契约-计划管理 §5.1） */
+  code: number | string
   httpStatus?: number
   data?: unknown
 
-  constructor(code: number, message: string, httpStatus?: number, data?: unknown) {
+  constructor(code: number | string, message: string, httpStatus?: number, data?: unknown) {
     super(message)
     this.name = 'ApiError'
     this.code = code

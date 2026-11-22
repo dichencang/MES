@@ -1,0 +1,74 @@
+<script setup lang="ts">
+// 销售订单详情（只读）。契约-计划管理 §2.2。onLoad 接收 ?id=。
+import {
+  getSalesOrder, ORDER_STATUS_LABEL, type SalesOrderDetailM, type SalesOrderItemM,
+} from '../../api/plan'
+
+const loading = ref(false)
+const detail = ref<SalesOrderDetailM | null>(null)
+const pageHeight = ref(0)
+
+function measure(): void {
+  const info = uni.getSystemInfoSync()
+  const h = (info.windowHeight as number) || 0
+  pageHeight.value = h > 0 ? h + 'px' : ''
+}
+
+async function load(id: string): Promise<void> {
+  loading.value = true
+  try {
+    detail.value = await getSalesOrder(id)
+  } finally {
+    loading.value = false
+  }
+}
+
+onLoad((options) => {
+  measure()
+  const id = options && options.id ? String(options.id) : ''
+  if (id) load(id)
+})
+</script>
+
+<template>
+  <view class="page uvx-light" :style="pageHeight ? 'height:' + pageHeight : ''">
+    <uni-nav-bar title="订单详情" :hide-default-back="false" navigation-bar-text-style="black"></uni-nav-bar>
+    <scroll-view class="body" v-if="detail">
+      <view class="card">
+        <view class="row"><text class="label">订单号：</text><text class="value strong">{{ detail.orderNo }}</text></view>
+        <view class="row"><text class="label">客户：</text><text class="value">{{ detail.customerName }}</text></view>
+        <view class="row"><text class="label">日期：</text><text class="value">{{ detail.orderDate }}</text></view>
+        <view class="row"><text class="label">状态：</text><text class="value">{{ ORDER_STATUS_LABEL[detail.status] || detail.status }}</text></view>
+        <view class="row" v-if="detail.remark"><text class="label">备注：</text><text class="value">{{ detail.remark }}</text></view>
+      </view>
+      <text class="section-title">订单明细</text>
+      <view v-for="it in detail.items" :key="it.id" class="card item">
+        <view class="row"><text class="line">第 {{ it.lineNo }} 行</text><text class="product">{{ it.productName }}</text></view>
+        <view class="row"><text class="label">编码：</text><text class="value">{{ it.productCode }}</text></view>
+        <view class="row"><text class="label">订单量 / 单位：</text><text class="value">{{ it.orderQty }} {{ it.unitName }}</text></view>
+        <view class="row"><text class="label">已排 / 可排：</text><text class="value">{{ it.scheduledQty }} / {{ it.availableQty }}</text></view>
+        <view class="row"><text class="label">完成量：</text><text class="value">{{ it.completedQty }}</text></view>
+        <view class="row"><text class="label">交期：</text><text class="value">{{ it.dueDate }}</text></view>
+        <view class="row" v-if="it.productStatus === '1'"><text class="stopped">产品已停用</text></view>
+      </view>
+    </scroll-view>
+    <view v-if="loading" class="loading"><text class="loading-text">加载中…</text></view>
+  </view>
+</template>
+
+<style>
+.page { width: 100%; flex-direction: column; background: #f4f7fb; }
+.body { flex: 1; }
+.card { margin: 12px 16px; background: #ffffff; border-radius: 10px; padding: 12px 14px; }
+.item { margin-top: 0; }
+.row { flex-direction: row; align-items: center; margin-bottom: 6px; }
+.label { font-size: 12px; color: #8a98aa; }
+.value { font-size: 12px; color: #263b55; }
+.strong { font-weight: 600; color: #1f2d3d; }
+.section-title { margin: 16px 16px 0; font-size: 13px; font-weight: 600; color: #8a98aa; }
+.line { font-size: 12px; color: #2f6fe4; }
+.product { font-size: 13px; font-weight: 600; color: #1f2d3d; flex: 1; text-align: right; }
+.stopped { font-size: 11px; color: #d9534f; }
+.loading { padding: 20px; align-items: center; }
+.loading-text { font-size: 13px; color: #a8b4c4; }
+</style>

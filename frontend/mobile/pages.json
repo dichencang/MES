@@ -14,6 +14,34 @@
 				"navigationStyle": "custom",
 				"disableScroll": true
 			}
+		},
+		{
+			"path": "pages/plan/sales-order-list",
+			"style": {
+				"navigationBarTitleText": "销售订单",
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/plan/sales-order-detail",
+			"style": {
+				"navigationBarTitleText": "订单详情",
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/plan/production-plan-list",
+			"style": {
+				"navigationBarTitleText": "生产计划",
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/plan/production-plan-detail",
+			"style": {
+				"navigationBarTitleText": "计划详情",
+				"navigationStyle": "custom"
+			}
 		}
 	],
 	"globalStyle": {

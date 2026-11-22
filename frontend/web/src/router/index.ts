@@ -49,6 +49,32 @@ export const extraRoutes: RouteRecordRaw[] = [
     component: () => import('@/views/basic/routing/View.vue'),
     meta: { title: '查看工艺路线', permCode: 'basic:routing:query' },
   },
+  // 计划管理：详情/新建/编辑带参数或需专用权限，由前端静态声明（契约-计划管理 §六）
+  {
+    path: '/plan/sales-order/new', name: 'plan-sales-order-new',
+    component: () => import('@/views/plan/sales-order/Edit.vue'),
+    meta: { title: '新建销售订单', permCode: 'plan:sales-order:create' },
+  },
+  {
+    path: '/plan/sales-order/edit/:id', name: 'plan-sales-order-edit',
+    component: () => import('@/views/plan/sales-order/Edit.vue'),
+    meta: { title: '编辑销售订单', permCode: 'plan:sales-order:update' },
+  },
+  {
+    path: '/plan/sales-order/view/:id', name: 'plan-sales-order-view',
+    component: () => import('@/views/plan/sales-order/View.vue'),
+    meta: { title: '销售订单详情', permCode: 'plan:sales-order:list' },
+  },
+  {
+    path: '/plan/production-plan/view/:id', name: 'plan-production-plan-view',
+    component: () => import('@/views/plan/production-plan/View.vue'),
+    meta: { title: '生产计划详情', permCode: 'plan:production-plan:list' },
+  },
+  {
+    path: '/plan/production-plan/edit/:id', name: 'plan-production-plan-edit',
+    component: () => import('@/views/plan/production-plan/Edit.vue'),
+    meta: { title: '编辑排期', permCode: 'plan:production-plan:update' },
+  },
 ]
 
 export const router = createRouter({

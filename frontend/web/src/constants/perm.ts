@@ -89,6 +89,25 @@ export const PERM = {
       delete: 'basic:routing:delete',
     },
   },
+  /** 计划管理（契约-计划管理 v1.0 §六）。列表与详情有意复用 list 码；候选查询复用 create 码 */
+  plan: {
+    salesOrder: {
+      list: 'plan:sales-order:list',
+      create: 'plan:sales-order:create',
+      update: 'plan:sales-order:update',
+      cancel: 'plan:sales-order:cancel',
+    },
+    productionPlan: {
+      list: 'plan:production-plan:list',
+      create: 'plan:production-plan:create',
+      update: 'plan:production-plan:update',
+      cancel: 'plan:production-plan:cancel',
+      transfer: 'plan:production-plan:transfer',
+    },
+    gantt: {
+      list: 'plan:gantt:list',
+    },
+  },
 } as const
 
 export type PermCode = string

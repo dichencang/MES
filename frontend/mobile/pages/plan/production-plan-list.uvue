@@ -1,0 +1,112 @@
+<script setup lang="ts">
+// 生产计划列表（只读）。契约-计划管理 §3.6。
+import {
+  listProductionPlans, PLAN_STATUS_LABEL, type ProductionPlanRowM,
+} from '../../api/plan'
+import { ApiError } from '../../utils/request'
+import { profileStore } from '../../utils/auth'
+
+const PERM_PLAN_LIST = 'plan:production-plan:list'
+
+const loading = ref(false)
+const rows = ref<ProductionPlanRowM[]>([])
+const keyword = ref('')
+const page = ref(1)
+const pageSize = 20
+const total = ref(0)
+const pageHeight = ref(0)
+
+function measure(): void {
+  const info = uni.getSystemInfoSync()
+  const h = (info.windowHeight as number) || 0
+  pageHeight.value = h > 0 ? h + 'px' : ''
+}
+
+function hasPerm(code: string): boolean {
+  const perm = profileStore.getPermissions()
+  return perm ? perm.permissionCodes.indexOf(code) >= 0 : false
+}
+
+async function load(reset: boolean = false): Promise<void> {
+  if (reset) page.value = 1
+  loading.value = true
+  try {
+    const params: Record<string, unknown> = { page: page.value, pageSize: pageSize }
+    if (keyword.value) params.planNo = keyword.value
+    const res = await listProductionPlans(params)
+    rows.value = reset ? res.list : rows.value.concat(res.list)
+    total.value = res.total
+  } catch (e) {
+    if (e instanceof ApiError && e.httpStatus === 403) {
+      uni.showToast({ title: '无查看权限', icon: 'none' })
+    }
+  } finally {
+    loading.value = false
+  }
+}
+
+function statusText(s: string): string {
+  return PLAN_STATUS_LABEL[s] || s
+}
+
+function openDetail(id: string): void {
+  uni.navigateTo({ url: '/pages/plan/production-plan-detail?id=' + id })
+}
+
+function loadMore(): void {
+  if (loading.value || rows.value.length >= total.value) return
+  page.value++
+  load(false)
+}
+
+onLoad(() => {
+  measure()
+  if (!hasPerm(PERM_PLAN_LIST)) {
+    uni.showToast({ title: '无查看权限', icon: 'none' })
+  }
+  load(true)
+})
+</script>
+
+<template>
+  <view class="page uvx-light" :style="pageHeight ? 'height:' + pageHeight : ''">
+    <uni-nav-bar title="生产计划" :hide-default-back="false" navigation-bar-text-style="black"></uni-nav-bar>
+    <scroll-view class="body">
+      <view class="search">
+        <input class="search-input" v-model="keyword" placeholder="搜索计划号" @confirm="load(true)" />
+        <view class="search-btn" @click="load(true)"><text class="search-btn-text">查询</text></view>
+      </view>
+      <view v-for="r in rows" :key="r.id" class="card" @click="openDetail(r.id)">
+        <view class="row">
+          <text class="plan-no">{{ r.planNo }}</text>
+          <text class="status">{{ statusText(r.status) }}</text>
+        </view>
+        <view class="row"><text class="label">订单：</text><text class="value">{{ r.orderNo }}</text></view>
+        <view class="row"><text class="label">产品：</text><text class="value">{{ r.productName }}</text></view>
+        <view class="row"><text class="label">计划量：</text><text class="value">{{ r.plannedQty }}</text></view>
+        <view class="row" v-if="r.workOrderNo"><text class="label">工单：</text><text class="value">{{ r.workOrderNo }}</text></view>
+      </view>
+      <view v-if="!rows.length && !loading" class="empty"><text class="empty-text">暂无计划</text></view>
+      <view v-if="rows.length < total" class="more" @click="loadMore"><text class="more-text">{{ loading ? '加载中…' : '加载更多' }}</text></view>
+    </scroll-view>
+  </view>
+</template>
+
+<style>
+.page { width: 100%; flex-direction: column; background: #f4f7fb; }
+.body { flex: 1; }
+.search { flex-direction: row; align-items: center; padding: 10px 16px; }
+.search-input { flex: 1; height: 36px; background: #ffffff; border-radius: 8px; padding: 0 10px; font-size: 13px; color: #263b55; }
+.search-btn { margin-left: 8px; height: 36px; padding: 0 14px; border-radius: 8px; background: #2f6fe4; align-items: center; justify-content: center; }
+.search-btn-text { font-size: 13px; color: #ffffff; }
+.card { margin: 0 16px 10px; background: #ffffff; border-radius: 10px; padding: 12px 14px; }
+.row { flex-direction: row; align-items: center; margin-bottom: 6px; }
+.plan-no { font-size: 15px; font-weight: 600; color: #1f2d3d; flex: 1; }
+.status { font-size: 12px; color: #2f6fe4; }
+.label { font-size: 12px; color: #8a98aa; }
+.value { font-size: 12px; color: #263b55; }
+.empty { margin-top: 60px; align-items: center; }
+.empty-text { font-size: 13px; color: #a8b4c4; }
+.more { padding: 14px; align-items: center; }
+.more-text { font-size: 13px; color: #2f6fe4; }
+</style>
