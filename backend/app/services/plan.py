@@ -14,6 +14,8 @@ ORDER = model.sales_order
 ITEM = model.sales_order_item
 PLAN = model.production_plan
 SHANGHAI = timezone(timedelta(hours=8))
+GANTT_MAX_DAYS = 92
+GANTT_MAX_PLANS = 2000
 CANCELLATION = "cancelled_at cancelled_by cancel_reason"
 ITEM_FIELDS = (
     "id line_no product_id product_code product_name product_status unit_code "
@@ -217,11 +219,18 @@ async def list_plans(db, plan_no, order_no, product_id, status, start, end, page
 
 
 async def gantt(db, start, end, product_id):
+    if (end - start).days >= GANTT_MAX_DAYS:
+        raise invalid("dateEnd", f"甘特图查询最多包含 {GANTT_MAX_DAYS} 个自然日")
     statement = time_window(plan_query(), start, end)
     if product_id is not None:
         statement = statement.where(ITEM.c.product_id == product_id)
     result = []
-    for row in await rows(db, statement.order_by(PLAN.c.planned_start_at, PLAN.c.id)):
+    records = await rows(
+        db, statement.order_by(PLAN.c.planned_start_at, PLAN.c.id).limit(GANTT_MAX_PLANS + 1),
+    )
+    if len(records) > GANTT_MAX_PLANS:
+        raise invalid("dateEnd", f"匹配计划超过 {GANTT_MAX_PLANS} 条，请缩短日期范围或筛选产品")
+    for row in records:
         value = serialize(row, "id plan_no order_no product_name planned_start_at planned_end_at status")
         value["planId"] = value.pop("id")
         value["startAt"] = value.pop("plannedStartAt")
