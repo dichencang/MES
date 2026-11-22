@@ -3,4 +3,5 @@
 export * from './modules/auth'
 export * from './modules/system'
 export * from './modules/basic'
+export * from './modules/plan'
 export { tokenStore } from './request'
