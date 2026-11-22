@@ -46,11 +46,17 @@ async def write_log(db, request, status, error=None):
     params = getattr(request.state, "audit_params", None)
     route = request.scope["route"]
     path = request.url.path
-    module = MODULE_NAMES[path.split("/")[1]]
+    resource = path.split("/")[1]
+    if resource == "plan":
+        module = "销售订单" if path.startswith("/plan/sales-orders") else "生产计划"
+    else:
+        module = MODULE_NAMES[resource]
     action = {
         "/auth/login": "登录", "/auth/logout": "登出",
         "/users/me/password": "修改本人密码", "/oper-logs": "清空操作日志",
     }.get(path)
+    if resource == "plan":
+        action = {"cancel": "取消", "transfer": "转工单"}.get(path.rsplit("/", 1)[-1], action)
     if action is None:
         action = {"POST": "新增", "PUT": "修改", "DELETE": "删除"}[request.method] + module
     await db.execute(m.oper_log.insert().values(

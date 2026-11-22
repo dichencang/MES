@@ -4,6 +4,7 @@ from sqlalchemy.dialects.postgresql import insert
 from app.config.settings import settings
 from app.models import system as m
 from app.models.basic_seed import seed_statements
+from app.models.plan_seed import permission_statements, seed_sample
 from app.models.seed_data import BUSINESS_MODULES, PERMISSIONS
 from app.utils.passwords import hash_password
 
@@ -37,13 +38,14 @@ async def seed_business_permissions(connection):
             module, perm_name=directory, perm_type="DIR",
             path=path, icon=icon, order_num=order,
         )
-    for statement in seed_statements():
+    for statement in (*seed_statements(), *permission_statements()):
         await connection.execute(statement)
 
 
 async def seed_system(connection):
     if await connection.scalar(select(m.user.c.id).where(m.user.c.username == "admin")):
         await seed_business_permissions(connection)
+        await seed_sample(connection)
         return
     await connection.execute(m.dept.insert().values(id=1, dept_name="总部", order_num=1))
     await connection.execute(m.role.insert().values(
@@ -78,3 +80,4 @@ async def seed_system(connection):
             f"SELECT setval(pg_get_serial_sequence('{table.name}', 'id'), MAX(id)) FROM {table.name}"
         ))
     await seed_business_permissions(connection)
+    await seed_sample(connection)
