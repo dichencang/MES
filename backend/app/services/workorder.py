@@ -196,6 +196,7 @@ def required_qty(item, quantity):
     if result <= 0 or result >= Decimal("100000000000000"):
         raise ApiError(409, "WORK_ORDER_QUANTITY_INVALID", "工单子件需求量舍入为零或超出范围", {
             "field": "plannedQty", "materialId": str(item["material_id"]),
+            "materialCode": item["material_code"], "materialName": item["material_name"],
             "sourceBomItemId": str(item["source_bom_item_id"]),
             "reason": "ROUNDED_TO_ZERO" if result <= 0 else "OVERFLOW",
         })

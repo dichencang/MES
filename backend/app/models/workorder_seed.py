@@ -38,9 +38,19 @@ async def seed_sample(db):
     component_id = await fixture_archive(db, basic.material, "WO-DEMO-PART", "工单联调子件",
                                          category_code="RAW", unit_code="PCS", is_product=False)
     process_id = await fixture_archive(db, basic.process, "WO-DEMO-STEP", "联调装配")
+    await seed_definitions(db, actor, product_id, component_id, process_id)
+    await create(db, actor, product_id, {
+        "planned_qty": Decimal("20"), "planned_start_at": datetime(2026, 11, 23, 0, tzinfo=UTC),
+        "planned_end_at": datetime(2026, 11, 23, 9, tzinfo=UTC), "remark": "本地工单联调样例",
+    }, number="WO-SAMPLE")
+    await seed_transfer_sample(db, actor, product_id)
+
+
+async def seed_definitions(db, actor, product_id, component_id, process_id, *,
+                           base_qty=Decimal("1"), component_qty=Decimal("2")):
     for definition, lines, counter, fields in (
         (basic.bom, basic.bom_item, "bom_max_version",
-         {"material_id": component_id, "qty": Decimal("2"), "sort_no": 1}),
+         {"material_id": component_id, "qty": component_qty, "sort_no": 1}),
         (basic.routing, basic.routing_step, "routing_max_version", {"process_id": process_id, "seq": 1}),
     ):
         active = await db.scalar(select(definition.c.id).where(
@@ -50,17 +60,14 @@ async def seed_sample(db):
             version = await db.scalar(basic.material.update().where(basic.material.c.id == product_id)
                                       .values({counter: basic.material.c[counter] + 1})
                                       .returning(basic.material.c[counter]))
+            quantities = {"base_qty": base_qty} if definition is basic.bom else {}
             active = await db.scalar(definition.insert().values(
+                **quantities,
                 product_id=product_id, version=version, status="1", last_editor_id=actor,
                 published_at=func.now(), publisher_id=actor,
             ).returning(definition.c.id))
             foreign_key = f"{definition.name.removeprefix('basic_')}_id"
             await db.execute(lines.insert().values(**fields, **{foreign_key: active}))
-    await create(db, actor, product_id, {
-        "planned_qty": Decimal("20"), "planned_start_at": datetime(2026, 11, 23, 0, tzinfo=UTC),
-        "planned_end_at": datetime(2026, 11, 23, 9, tzinfo=UTC), "remark": "本地工单联调样例",
-    }, number="WO-SAMPLE")
-    await seed_transfer_sample(db, actor, product_id)
 
 
 async def fixture_archive(db, table, code, name, **fields):
