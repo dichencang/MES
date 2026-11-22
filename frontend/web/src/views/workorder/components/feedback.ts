@@ -8,6 +8,9 @@ export interface MissingDefinitionData { productId: string; missingItems: Array<
 export interface QuantityInvalidData {
   field: string
   materialId: string
+  /** 后端 2026-11-22 增补；旧数据可能缺，缺时前端回退显示 materialId */
+  materialCode?: string | null
+  materialName?: string | null
   sourceBomItemId: string
   reason: 'ROUNDED_TO_ZERO' | 'OVERFLOW'
 }
@@ -56,8 +59,12 @@ export async function showMissingDefinition(data: unknown): Promise<boolean> {
 export async function showQuantityInvalid(data: unknown): Promise<void> {
   const d = asQuantityInvalid(data)
   const why = d?.reason === 'OVERFLOW' ? '需求量超出字段上限' : '需求量四舍五入后为零'
+  // 优先用后端给的物料编码/名称；旧响应缺字段时回退到内码，保证不出现空文案
+  const target = d?.materialCode
+    ? `${d.materialCode}${d.materialName ? ` ${d.materialName}` : ''}`
+    : `物料 ID：${d?.materialId ?? '—'}`
   await ElMessageBox.alert(
-    `按当前工单数量计算的子件${why}（物料 ID：${d?.materialId ?? '—'}），本次保存已整单取消。\n\n请调整计划数量后重试。`,
+    `按当前工单数量计算的子件「${target}」${why}，本次保存已整单取消。\n\n请调整计划数量后重试。`,
     '子件需求量异常',
     { type: 'warning', confirmButtonText: '知道了' },
   )
