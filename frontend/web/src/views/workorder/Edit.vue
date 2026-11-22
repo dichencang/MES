@@ -17,6 +17,10 @@ const editing = computed(() => Boolean(route.params.id))
 const formRef = ref<FormInstance>()
 const submitting = ref(false)
 const loading = ref(false)
+/** 详情下发的 actions.canEdit：为 false 时页面整体冻结（后端仍会重新校验） */
+const canEdit = ref(true)
+const frozenReason = ref('')
+const frozen = computed(() => editing.value && !canEdit.value)
 
 const form = reactive({
   productId: '',
@@ -58,6 +62,8 @@ async function loadDetail() {
   loading.value = true
   try {
     const d: WorkOrderDetail = await getWorkOrder(String(route.params.id))
+    canEdit.value = d.actions.canEdit
+    frozenReason.value = d.actions.disableReasons.edit?.message ?? '当前状态下不可修改'
     form.productId = d.productId
     form.productLabel = `${d.productCode} ${d.productName}`
     form.plannedQty = d.plannedQty
@@ -140,7 +146,16 @@ onMounted(() => { searchProduct(''); if (editing.value) loadDetail() })
     <template #header><span class="title">{{ editing ? '编辑工单' : '手工新建工单' }}</span></template>
 
     <el-alert
-      v-if="editing"
+      v-if="editing && frozen"
+      class="mb"
+      type="warning"
+      :closable="false"
+      show-icon
+      title="当前状态不可修改"
+      :description="`${frozenReason}。仅待下发的工单可改数量、排期与备注。`"
+    />
+    <el-alert
+      v-else-if="editing"
       class="mb"
       type="info"
       :closable="false"
@@ -162,26 +177,26 @@ onMounted(() => { searchProduct(''); if (editing.value) loadDetail() })
       </el-form-item>
 
       <el-form-item label="计划数量" prop="plannedQty">
-        <el-input v-model="form.plannedQty" placeholder="如 100.0000" class="qty" />
+        <el-input v-model="form.plannedQty" placeholder="如 100.0000" class="qty" :disabled="frozen" />
         <span class="hint">四位小数；子件需求按此数量自动计算</span>
       </el-form-item>
 
       <el-form-item label="计划起止">
         <el-date-picker
-          v-model="form.range" type="datetimerange"
+          v-model="form.range" type="datetimerange" :disabled="frozen"
           range-separator="至" start-placeholder="开始时间" end-placeholder="结束时间"
           format="YYYY-MM-DD HH:mm" :default-time="[new Date(2000, 1, 1, 8, 0, 0), new Date(2000, 1, 1, 17, 0, 0)]"
         />
       </el-form-item>
 
       <el-form-item label="备注">
-        <el-input v-model="form.remark" type="textarea" :rows="2" maxlength="200" show-word-limit />
+        <el-input v-model="form.remark" type="textarea" :rows="2" maxlength="200" show-word-limit :disabled="frozen" />
       </el-form-item>
     </el-form>
 
     <template #footer>
       <el-button @click="router.back()">取消</el-button>
-      <el-button type="primary" :loading="submitting" @click="submit">保存</el-button>
+      <el-button type="primary" :loading="submitting" :disabled="frozen" @click="submit">保存</el-button>
     </template>
   </el-card>
 </template>
